@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
-import { ShieldAlert, CheckCircle2, User, Key, Mail, Edit3, Compass } from 'lucide-react'
+import { ShieldAlert, CheckCircle2, User, Key, Mail, Edit3, Compass, DollarSign } from 'lucide-react'
 
 interface ProfilePageClientProps {
   role: 'SUPER_ADMIN' | 'CONTRACTOR_OWNER' | 'SITE_ENGINEER'
@@ -21,6 +21,7 @@ export function ProfilePageClient({ role }: ProfilePageClientProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [currency, setCurrency] = useState('USD')
   
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
@@ -38,6 +39,8 @@ export function ProfilePageClient({ role }: ProfilePageClientProps) {
       setCurrentUser(profile)
       setFullName(profile.full_name)
       setEmail(profile.email)
+      const savedCurrency = localStorage.getItem('sitepilot_currency')
+      if (savedCurrency) setCurrency(savedCurrency)
     } else {
       router.push('/login')
     }
@@ -129,6 +132,8 @@ export function ProfilePageClient({ role }: ProfilePageClientProps) {
         entity_id: currentUser.id,
         metadata: { fieldUpdated: 'profile_settings', emailChanged: cleanEmail !== currentUser.email }
       })
+
+      localStorage.setItem('sitepilot_currency', currency)
 
       setSuccess('Profile updated successfully!')
       setPassword('')
@@ -257,6 +262,31 @@ export function ProfilePageClient({ role }: ProfilePageClientProps) {
                       value={email}
                       onChange={e => setEmail(e.target.value)}
                     />
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-border/20 my-6 pt-6">
+                <h4 className="text-sm font-semibold mb-4 text-foreground flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4 text-indigo-400" />
+                  Localization Preferences
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="currency">Display Currency</Label>
+                    <select
+                      id="currency"
+                      className="flex w-full rounded-xl border border-border/40 bg-background/30 px-3 h-11 text-sm focus-visible:outline-none"
+                      value={currency}
+                      onChange={e => setCurrency(e.target.value)}
+                    >
+                      <option value="USD">USD ($)</option>
+                      <option value="INR">INR (₹)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="GBP">GBP (£)</option>
+                      <option value="AUD">AUD (A$)</option>
+                      <option value="CAD">CAD (C$)</option>
+                    </select>
                   </div>
                 </div>
               </div>

@@ -5,14 +5,18 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { 
   ClipboardList, 
   Search, 
   Calendar, 
-  MapPin, 
   AlertTriangle,
   User,
-  CheckCircle2
+  CheckCircle2,
+  Plus,
+  Trash2,
+  Edit3
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
@@ -32,8 +36,22 @@ export default function ContractorDailyReports() {
   const router = useRouter()
   const [contractor, setContractor] = useState<UserProfile | null>(null)
   const [reports, setReports] = useState<DailyReport[]>([])
+  const [projects, setProjects] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [loading, setLoading] = useState(true)
+
+  // Form states
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [editingReport, setEditingReport] = useState<DailyReport | null>(null)
+  
+  const [formData, setFormData] = useState({
+    projectId: '',
+    date: new Date().toISOString().split('T')[0],
+    workCompleted: '',
+    issues: '',
+    notes: ''
+  })
+  const [formLoading, setFormLoading] = useState(false)
 
   useEffect(() => {
     fetchSession()
@@ -54,6 +72,20 @@ export default function ContractorDailyReports() {
     try {
       const supabase = createClient()
       
+      // Fetch projects for dropdown
+      const { data: projData } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('company_id', companyId)
+      
+      if (projData) {
+        setProjects(projData)
+        if (projData.length > 0) {
+          setFormData(prev => ({ ...prev, projectId: projData[0].id }))
+        }
+      }
+
+      // Fetch reports
       const { data: reportsData, error } = await supabase
         .from('daily_reports')
         .select('*, project:projects!inner(*), reporter:users(*)')
@@ -82,6 +114,68 @@ export default function ContractorDailyReports() {
     }
   }
 
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!contractor) return
+    setFormLoading(true)
+
+    try {
+      const supabase = createClient()
+      const payload = {
+        project_id: formData.projectId,
+        reporter_id: contractor.id,
+        report_date: formData.date,
+        work_completed: formData.workCompleted,
+        issues: formData.issues,
+        notes: formData.notes
+      }
+
+      if (editingReport) {
+        await supabase.from('daily_reports').update(payload).eq('id', editingReport.id)
+      } else {
+        await supabase.from('daily_reports').insert([payload])
+      }
+      
+      setIsCreateOpen(false)
+      setEditingReport(null)
+      setFormData({
+        projectId: projects[0]?.id || '',
+        date: new Date().toISOString().split('T')[0],
+        workCompleted: '',
+        issues: '',
+        notes: ''
+      })
+      loadData(contractor.company_id!)
+    } catch (err) {
+      console.error(err)
+      alert('Failed to save report')
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this report?')) return
+    try {
+      const supabase = createClient()
+      await supabase.from('daily_reports').delete().eq('id', id)
+      loadData(contractor!.company_id!)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const startEdit = (report: DailyReport) => {
+    setEditingReport(report)
+    setFormData({
+      projectId: report.projectId,
+      date: report.date,
+      workCompleted: report.workCompleted,
+      issues: report.issues,
+      notes: report.notes
+    })
+  }
+
   const filteredReports = reports.filter(r => 
     r.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     r.reporterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -100,6 +194,91 @@ export default function ContractorDailyReports() {
             onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
+
+        {/* Add Report Modal */}
+        <Dialog open={isCreateOpen || !!editingReport} onOpenChange={(open) => {
+          if (!open) {
+            setIsCreateOpen(false)
+            setEditingReport(null)
+            setFormData({
+              projectId: projects[0]?.id || '',
+              date: new Date().toISOString().split('T')[0],
+              workCompleted: '',
+              issues: '',
+              notes: ''
+            })
+          } else {
+            setIsCreateOpen(true)
+          }
+        }}>
+          <DialogTrigger render={
+            <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl shadow-lg shadow-indigo-500/20 gap-2 w-full sm:w-auto py-5 transition-all duration-300">
+              <Plus className="h-4.5 w-4.5" /> File New Report
+            </Button>
+          } />
+          <DialogContent className="sm:max-w-[500px] rounded-2xl bg-card border-border/40 max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold font-heading bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                {editingReport ? 'Edit Daily Report' : 'File Daily Report'}
+              </DialogTitle>
+              <CardDescription>Log daily site progress, issues, and activities.</CardDescription>
+            </DialogHeader>
+            <form onSubmit={handleSave} className="space-y-4 mt-2">
+              <div className="space-y-2">
+                <Label>Select Project</Label>
+                <select
+                  required
+                  className="flex w-full rounded-xl border border-border/40 bg-background/30 px-3 h-11 text-sm focus-visible:outline-none"
+                  value={formData.projectId}
+                  onChange={e => setFormData({...formData, projectId: e.target.value})}
+                >
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id} className="bg-card">{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Input 
+                  type="date" required
+                  className="rounded-xl border-border/40 bg-background/30 h-11"
+                  value={formData.date}
+                  onChange={e => setFormData({...formData, date: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Work Completed</Label>
+                <textarea 
+                  required placeholder="Describe the work done today..."
+                  className="flex w-full rounded-xl border border-border/40 bg-background/30 p-3 min-h-[100px] text-sm focus-visible:outline-none focus:border-indigo-500/50"
+                  value={formData.workCompleted}
+                  onChange={e => setFormData({...formData, workCompleted: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Issues & Delays</Label>
+                <textarea 
+                  placeholder="Any roadblocks, weather delays, etc..."
+                  className="flex w-full rounded-xl border border-border/40 bg-background/30 p-3 min-h-[80px] text-sm focus-visible:outline-none focus:border-indigo-500/50"
+                  value={formData.issues}
+                  onChange={e => setFormData({...formData, issues: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Additional Notes</Label>
+                <textarea 
+                  placeholder="Any other observations..."
+                  className="flex w-full rounded-xl border border-border/40 bg-background/30 p-3 min-h-[80px] text-sm focus-visible:outline-none focus:border-indigo-500/50"
+                  value={formData.notes}
+                  onChange={e => setFormData({...formData, notes: e.target.value})}
+                />
+              </div>
+              <Button type="submit" disabled={formLoading} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl py-6 font-semibold shadow-lg shadow-indigo-500/20 mt-4">
+                {formLoading ? 'Saving...' : 'Save Report'}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {loading ? (
@@ -126,10 +305,15 @@ export default function ContractorDailyReports() {
                       <Calendar className="w-4 h-4" /> {report.date}
                     </CardDescription>
                   </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="inline-block bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                      Report Filed
-                    </span>
+                  <div className="flex flex-col items-end gap-2">
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => startEdit(report)} className="h-8 w-8 text-muted-foreground hover:text-indigo-400">
+                        <Edit3 className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(report.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardHeader>

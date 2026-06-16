@@ -17,18 +17,25 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
+import { useCurrency } from '@/hooks/useCurrency'
 
 export default function ContractorDashboard() {
   const router = useRouter()
+  const { symbol, formatCurrencyNoDecimals } = useCurrency()
   const [contractor, setContractor] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Live aggregated stats
-  const [kpis, setKpis] = useState<any[]>([])
+  const [kpiData, setKpiData] = useState({
+    moneyIn: 0,
+    moneyOut: 0,
+    materialsSum: 0,
+    outstandingDues: 0
+  })
   const [projectCosts, setProjectCosts] = useState<any[]>([])
   const [monthlyChart, setMonthlyChart] = useState<any[]>([])
   const [targetMetPct, setTargetMetPct] = useState('0.0%')
-  const [netProfitText, setNetProfitText] = useState('$0')
+  const [netProfit, setNetProfit] = useState(0)
   const [grossYieldText, setGrossYieldText] = useState('0.0%')
 
   useEffect(() => {
@@ -109,21 +116,21 @@ export default function ContractorDashboard() {
       const accruedProjectCost = totalExpensesSum + totalMaterialsSum
 
       // Set KPIs
-      setKpis([
-        { name: 'Total Money In', value: `$${moneyIn.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, change: `Client Payments`, type: 'up', icon: ArrowUpRight, desc: 'Total Received' },
-        { name: 'Total Money Out', value: `$${moneyOut.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, change: `Expenses & Suppliers`, type: 'warn', icon: ArrowDownRight, desc: 'Total Paid Out' },
-        { name: 'Accrued Material Costs', value: `$${totalMaterialsSum.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, change: `Materials Only`, type: 'info', icon: Receipt, desc: 'Logged invoices' },
-        { name: 'Outstanding Dues', value: `$${outstandingSupplierDues.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, change: 'To Suppliers', type: 'warn', icon: Truck, desc: 'Payable balance' }
-      ])
+      setKpiData({
+        moneyIn,
+        moneyOut,
+        materialsSum: totalMaterialsSum,
+        outstandingDues: outstandingSupplierDues
+      })
 
       // Margins
-      const netProfit = moneyIn - accruedProjectCost
-      const grossYield = moneyIn > 0 ? (netProfit / moneyIn) * 100 : 0
+      const calculatedNetProfit = moneyIn - accruedProjectCost
+      const grossYield = moneyIn > 0 ? (calculatedNetProfit / moneyIn) * 100 : 0
       
-      setNetProfitText(`$${netProfit.toLocaleString(undefined, { maximumFractionDigits: 0 })}`)
+      setNetProfit(calculatedNetProfit)
       setGrossYieldText(`${grossYield.toFixed(1)}%`)
       // Target operational profit set to $50,000 for calculation
-      const targetMet = Math.min(Math.max((netProfit / 50000) * 100, 0), 100)
+      const targetMet = Math.min(Math.max((calculatedNetProfit / 50000) * 100, 0), 100)
       setTargetMetPct(`${targetMet.toFixed(1)}%`)
 
       // Project Financial Audit Table
@@ -138,8 +145,8 @@ export default function ContractorDashboard() {
 
         return {
           name: p.name,
-          budget: `$${projectBudget.toLocaleString()}`,
-          cost: `$${projectCost.toLocaleString()}`,
+          budget: projectBudget,
+          cost: projectCost,
           progress,
           color: colors[idx % colors.length]
         }
@@ -196,6 +203,13 @@ export default function ContractorDashboard() {
       setLoading(false)
     }
   }
+
+  const kpis = [
+    { name: 'Total Money In', value: formatCurrencyNoDecimals(kpiData.moneyIn), change: `Client Payments`, type: 'up', icon: ArrowUpRight, desc: 'Total Received' },
+    { name: 'Total Money Out', value: formatCurrencyNoDecimals(kpiData.moneyOut), change: `Expenses & Suppliers`, type: 'warn', icon: ArrowDownRight, desc: 'Total Paid Out' },
+    { name: 'Accrued Material Costs', value: formatCurrencyNoDecimals(kpiData.materialsSum), change: `Materials Only`, type: 'info', icon: Receipt, desc: 'Logged invoices' },
+    { name: 'Outstanding Dues', value: formatCurrencyNoDecimals(kpiData.outstandingDues), change: 'To Suppliers', type: 'warn', icon: Truck, desc: 'Payable balance' }
+  ]
 
   return (
     <div className="space-y-8">
@@ -280,7 +294,7 @@ export default function ContractorDashboard() {
             <Card className="border border-border/40 bg-card/40 backdrop-blur-sm flex flex-col justify-between">
               <CardHeader>
                 <CardTitle className="text-lg font-bold">Operational Profit Target</CardTitle>
-                <CardDescription>Net target yield (Quarterly Target: $50,000)</CardDescription>
+                <CardDescription>Net target yield (Quarterly Target: {formatCurrencyNoDecimals(50000)})</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6 pt-4 flex-1 flex flex-col justify-center">
                 <div className="flex justify-center relative items-center">
@@ -295,11 +309,11 @@ export default function ContractorDashboard() {
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-center border-t border-border/40 pt-4">
                   <div>
-                    <span className="text-xs text-muted-foreground font-semibold">Net Profit Margin</span>
-                    <h4 className="text-lg font-bold text-indigo-500 mt-0.5">{netProfitText}</h4>
+                    <span className="text-xs text-muted-foreground font-semibold flex items-center justify-center gap-1">Net Profit Margin <span className="text-[10px] bg-muted px-1.5 rounded-sm">Money In - Costs</span></span>
+                    <h4 className="text-lg font-bold text-indigo-500 mt-0.5">{formatCurrencyNoDecimals(netProfit)}</h4>
                   </div>
                   <div>
-                    <span className="text-xs text-muted-foreground font-semibold">Gross Yield</span>
+                    <span className="text-xs text-muted-foreground font-semibold flex items-center justify-center gap-1">Gross Yield <span className="text-[10px] bg-muted px-1.5 rounded-sm">Profit / Revenue</span></span>
                     <h4 className="text-lg font-bold text-pink-500 mt-0.5">{grossYieldText}</h4>
                   </div>
                 </div>
@@ -321,7 +335,7 @@ export default function ContractorDashboard() {
                   <div key={idx} className="space-y-2 p-3 hover:bg-muted/40 rounded-xl transition-all border border-transparent hover:border-border/30">
                     <div className="flex justify-between items-center text-sm font-semibold">
                       <span>{project.name}</span>
-                      <span className="text-muted-foreground">{project.cost} / <strong className="text-foreground">{project.budget}</strong></span>
+                      <span className="text-muted-foreground">{formatCurrencyNoDecimals(project.cost)} / <strong className="text-foreground">{formatCurrencyNoDecimals(project.budget)}</strong></span>
                     </div>
                     <div className="w-full h-2 bg-muted rounded-full overflow-hidden flex">
                       <div className={`h-full rounded-full ${project.color}`} style={{ width: `${project.progress}%` }} />

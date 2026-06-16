@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
-import { ShieldAlert, Plus, Trash2, User, Mail, Search, ShieldCheck } from 'lucide-react'
+import { ShieldAlert, Plus, Trash2, User, Mail, Search, ShieldCheck, Edit3, ExternalLink } from 'lucide-react'
 
 export default function EngineersPage() {
   const router = useRouter()
@@ -25,6 +26,14 @@ export default function EngineersPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+
+  // Edit fields
+  const [editingEngineer, setEditingEngineer] = useState<UserProfile | null>(null)
+  const [editFullName, setEditFullName] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editPassword, setEditPassword] = useState('')
+  const [editLoading, setEditLoading] = useState(false)
+  const [editError, setEditError] = useState('')
 
   useEffect(() => {
     fetchSession()
@@ -105,6 +114,38 @@ export default function EngineersPage() {
     }
   }
 
+  const handleEditEngineer = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingEngineer) return
+    setEditLoading(true)
+    setEditError('')
+
+    try {
+      const res = await fetch('/api/engineers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingEngineer.id,
+          fullName: editFullName,
+          email: editEmail,
+          password: editPassword
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update engineer.')
+      }
+
+      setEditingEngineer(null)
+      if (contractor) loadEngineers(contractor.company_id)
+    } catch (err: any) {
+      setEditError(err.message || 'Failed to update engineer')
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
   const handleDeleteEngineer = async (engineer: UserProfile) => {
     if (confirm(`Are you sure you want to delete engineer: ${engineer.full_name}?`)) {
       try {
@@ -120,6 +161,14 @@ export default function EngineersPage() {
         console.error(e)
       }
     }
+  }
+
+  const openEditModal = (eng: UserProfile) => {
+    setEditingEngineer(eng)
+    setEditFullName(eng.full_name)
+    setEditEmail(eng.email)
+    setEditPassword('')
+    setEditError('')
   }
 
   const filteredEngineers = engineers.filter(eng => 
@@ -139,6 +188,56 @@ export default function EngineersPage() {
           </p>
         </div>
       </div>
+
+      <Dialog open={!!editingEngineer} onOpenChange={(open) => !open && setEditingEngineer(null)}>
+        <DialogContent className="sm:max-w-[400px] rounded-2xl bg-card border-border/40">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold font-heading bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">Edit Engineer</DialogTitle>
+          </DialogHeader>
+          {editError && (
+            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-xl p-3 mb-4 flex gap-2 items-center">
+              <ShieldAlert className="h-4 w-4 shrink-0" />
+              <span>{editError}</span>
+            </div>
+          )}
+          <form onSubmit={handleEditEngineer} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Full Name</Label>
+              <Input 
+                required 
+                className="rounded-xl h-11 border-border/40 bg-background/30 focus:border-indigo-500/50"
+                value={editFullName}
+                onChange={e => setEditFullName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email Address</Label>
+              <Input 
+                type="email" required 
+                className="rounded-xl h-11 border-border/40 bg-background/30 focus:border-indigo-500/50"
+                value={editEmail}
+                onChange={e => setEditEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>New Password (Optional)</Label>
+              <Input 
+                type="password"
+                placeholder="Leave blank to keep unchanged"
+                className="rounded-xl h-11 border-border/40 bg-background/30 focus:border-indigo-500/50"
+                value={editPassword}
+                onChange={e => setEditPassword(e.target.value)}
+              />
+            </div>
+            <Button 
+              type="submit" disabled={editLoading}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl py-5 font-semibold transition-all mt-2"
+            >
+              {editLoading ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left column: Add Engineer Form */}
@@ -269,6 +368,22 @@ export default function EngineersPage() {
                       </div>
 
                       <div className="flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => window.open(`/site-engineer/dashboard?engineerId=${eng.id}`, '_blank')}
+                          className="text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 rounded-xl"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 mr-1" /> Access
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => openEditModal(eng)}
+                          className="text-muted-foreground hover:text-indigo-400 hover:bg-indigo-500/10 rounded-xl"
+                        >
+                          <Edit3 className="w-4.5 h-4.5" />
+                        </Button>
                         <Button 
                           variant="ghost" 
                           size="icon" 

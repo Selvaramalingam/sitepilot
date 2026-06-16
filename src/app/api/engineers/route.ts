@@ -127,3 +127,65 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: e.message || 'Server error' }, { status: 500 })
   }
 }
+
+export async function PUT(req: Request) {
+  try {
+    const owner = await authenticateContractorOwner()
+    if (!owner) {
+      return NextResponse.json({ error: 'Unauthorized. Contractor Owner access required.' }, { status: 401 })
+    }
+
+    const { id, fullName, email, password } = await req.json()
+    if (!id) return NextResponse.json({ error: 'Missing user ID' }, { status: 400 })
+
+    const supabaseAdmin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    // Verify ownership
+    const { data: targetProfile, error: profileError } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .eq('company_id', owner.company_id)
+      .eq('role', 'SITE_ENGINEER')
+      .single()
+
+    if (profileError || !targetProfile) {
+      return NextResponse.json({ error: 'Site Engineer not found or does not belong to your company.' }, { status: 404 })
+    }
+
+    const updates: any = {}
+    if (email && email.toLowerCase().trim() !== targetProfile.email) {
+      updates.email = email.toLowerCase().trim()
+      updates.email_confirm = true
+    }
+    if (password && password.trim().length > 0) {
+      updates.password = password
+    }
+    if (fullName && fullName !== targetProfile.full_name) {
+      updates.user_metadata = {
+        ...targetProfile.raw_user_meta_data,
+        full_name: fullName
+      }
+    }
+
+    // Update in Auth
+    if (Object.keys(updates).length > 0) {
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(id, updates)
+      if (updateError) {
+        return NextResponse.json({ error: updateError.message }, { status: 500 })
+      }
+    }
+
+    // If full_name changed, also manually update the public.users table just in case triggers miss it
+    if (fullName && fullName !== targetProfile.full_name) {
+      await supabaseAdmin.from('users').update({ full_name: fullName }).eq('id', id)
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message || 'Server error' }, { status: 500 })
+  }
+}

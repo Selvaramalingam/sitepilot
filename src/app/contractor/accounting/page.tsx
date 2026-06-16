@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
+import { useCurrency } from '@/hooks/useCurrency'
 
 interface MoneyInRecord {
   id: string
@@ -42,6 +43,7 @@ interface MoneyOutRecord {
 
 export default function Cashbook() {
   const router = useRouter()
+  const { symbol, formatCurrency } = useCurrency()
   const [contractor, setContractor] = useState<UserProfile | null>(null)
   const [projects, setProjects] = useState<any[]>([])
   const [suppliers, setSuppliers] = useState<any[]>([])
@@ -213,7 +215,7 @@ export default function Cashbook() {
   // Calculations
   const totalMoneyIn = moneyInLogs.reduce((acc, p) => acc + p.amount, 0)
   const totalMoneyOut = moneyOutLogs.reduce((acc, p) => acc + p.amount, 0)
-  const totalProjectCost = materialsCost + expensesCost + totalMoneyOut
+  const totalProjectCost = materialsCost + expensesCost
   const netBalance = totalMoneyIn - totalProjectCost
   const profitMargin = totalMoneyIn > 0 ? (netBalance / totalMoneyIn) * 100 : 0
 
@@ -224,21 +226,21 @@ export default function Cashbook() {
         <Card className="border border-border/40 bg-card/40 backdrop-blur-sm p-4 flex items-center justify-between">
           <div>
             <span className="text-xs text-muted-foreground font-semibold">Total Money Received</span>
-            <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-emerald-500">${totalMoneyIn.toLocaleString()}</h3>
+            <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-emerald-500">{formatCurrency(totalMoneyIn)}</h3>
           </div>
           <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500"><ArrowUpRight className="w-5 h-5" /></div>
         </Card>
         <Card className="border border-border/40 bg-card/40 backdrop-blur-sm p-4 flex items-center justify-between">
           <div>
             <span className="text-xs text-muted-foreground font-semibold">Total Accrued Cost</span>
-            <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-pink-500">${totalProjectCost.toLocaleString()}</h3>
+            <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-pink-500">{formatCurrency(totalProjectCost)}</h3>
           </div>
           <div className="w-10 h-10 rounded-xl bg-pink-500/10 flex items-center justify-center text-pink-500"><ArrowDownRight className="w-5 h-5" /></div>
         </Card>
         <Card className="border border-border/40 bg-card/40 backdrop-blur-sm p-4 flex items-center justify-between">
           <div>
             <span className="text-xs text-muted-foreground font-semibold">Net Balance (Profit)</span>
-            <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-indigo-500">${netBalance.toLocaleString()}</h3>
+            <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-indigo-500">{formatCurrency(netBalance)}</h3>
           </div>
           <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500"><DollarSign className="w-5 h-5" /></div>
         </Card>
@@ -274,7 +276,7 @@ export default function Cashbook() {
                     <Input id="in-source" required className="rounded-xl border-border/40 bg-background/30 h-11" value={newMoneyIn.sourceName} onChange={e => setNewMoneyIn({...newMoneyIn, sourceName: e.target.value})} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label htmlFor="in-amount">Amount ($)</Label><Input id="in-amount" required type="number" className="rounded-xl border-border/40 bg-background/30 h-11" value={newMoneyIn.amount} onChange={e => setNewMoneyIn({...newMoneyIn, amount: e.target.value})} /></div>
+                    <div className="space-y-2"><Label htmlFor="in-amount">Amount ({symbol})</Label><Input id="in-amount" required type="number" className="rounded-xl border-border/40 bg-background/30 h-11" value={newMoneyIn.amount} onChange={e => setNewMoneyIn({...newMoneyIn, amount: e.target.value})} /></div>
                     <div className="space-y-2"><Label htmlFor="in-date">Date</Label><Input id="in-date" type="date" required className="rounded-xl border-border/40 bg-background/30 h-11" value={newMoneyIn.date} onChange={e => setNewMoneyIn({...newMoneyIn, date: e.target.value})} /></div>
                   </div>
                   <div className="space-y-2">
@@ -302,7 +304,7 @@ export default function Cashbook() {
                   {moneyInLogs.map(p => (
                     <tr key={p.id} className="hover:bg-muted/30">
                       <td className="px-4 py-3.5"><div className="font-semibold">{p.sourceName}</div><span className="text-xs text-muted-foreground">{p.projectName}</span></td>
-                      <td className="px-4 py-3.5 font-bold text-emerald-500">${p.amount.toLocaleString()}</td>
+                      <td className="px-4 py-3.5 font-bold text-emerald-500">{formatCurrency(p.amount)}</td>
                       <td className="px-4 py-3.5 text-right flex justify-end gap-1">
                         <Dialog open={editingMoneyIn?.id === p.id} onOpenChange={(open) => !open && setEditingMoneyIn(null)}>
                           <DialogTrigger render={<Button variant="ghost" size="icon" onClick={() => { setEditingMoneyIn(p); setEditMoneyInForm({ sourceName: p.sourceName, amount: p.amount.toString(), date: p.date, method: p.method }) }} className="h-8 w-8 text-muted-foreground hover:text-indigo-400"><Edit3 className="w-4 h-4" /></Button>} />
@@ -311,7 +313,7 @@ export default function Cashbook() {
                             <form onSubmit={handleEditMoneyInSubmit} className="space-y-4">
                               <div className="space-y-2"><Label>From</Label><Input required value={editMoneyInForm.sourceName} onChange={e => setEditMoneyInForm({...editMoneyInForm, sourceName: e.target.value})} className="rounded-xl border-border/40 bg-background/30 h-11" /></div>
                               <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label>Amount ($)</Label><Input required type="number" value={editMoneyInForm.amount} onChange={e => setEditMoneyInForm({...editMoneyInForm, amount: e.target.value})} className="rounded-xl border-border/40 bg-background/30 h-11" /></div>
+                                <div className="space-y-2"><Label>Amount ({symbol})</Label><Input required type="number" value={editMoneyInForm.amount} onChange={e => setEditMoneyInForm({...editMoneyInForm, amount: e.target.value})} className="rounded-xl border-border/40 bg-background/30 h-11" /></div>
                                 <div className="space-y-2"><Label>Date</Label><Input type="date" required value={editMoneyInForm.date} onChange={e => setEditMoneyInForm({...editMoneyInForm, date: e.target.value})} className="rounded-xl border-border/40 bg-background/30 h-11" /></div>
                               </div>
                               <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-6 font-semibold">Update</Button>
@@ -352,7 +354,7 @@ export default function Cashbook() {
                     </select>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label htmlFor="out-amount">Amount ($)</Label><Input id="out-amount" required type="number" className="rounded-xl border-border/40 bg-background/30 h-11" value={newMoneyOut.amount} onChange={e => setNewMoneyOut({...newMoneyOut, amount: e.target.value})} /></div>
+                    <div className="space-y-2"><Label htmlFor="out-amount">Amount ({symbol})</Label><Input id="out-amount" required type="number" className="rounded-xl border-border/40 bg-background/30 h-11" value={newMoneyOut.amount} onChange={e => setNewMoneyOut({...newMoneyOut, amount: e.target.value})} /></div>
                     <div className="space-y-2"><Label htmlFor="out-date">Date</Label><Input id="out-date" type="date" required className="rounded-xl border-border/40 bg-background/30 h-11" value={newMoneyOut.date} onChange={e => setNewMoneyOut({...newMoneyOut, date: e.target.value})} /></div>
                   </div>
                   <div className="space-y-2"><Label htmlFor="out-notes">Details / Notes</Label><Input id="out-notes" className="rounded-xl border-border/40 bg-background/30 h-11" value={newMoneyOut.notes} onChange={e => setNewMoneyOut({...newMoneyOut, notes: e.target.value})} /></div>
@@ -373,7 +375,7 @@ export default function Cashbook() {
                   {moneyOutLogs.map(p => (
                     <tr key={p.id} className="hover:bg-muted/30">
                       <td className="px-4 py-3.5"><div className="font-semibold">{p.supplier}</div><span className="text-xs text-muted-foreground">{p.projectName}</span></td>
-                      <td className="px-4 py-3.5 font-bold text-pink-500">${p.amount.toLocaleString()}</td>
+                      <td className="px-4 py-3.5 font-bold text-pink-500">{formatCurrency(p.amount)}</td>
                       <td className="px-4 py-3.5 text-right flex justify-end gap-1">
                         <Dialog open={editingMoneyOut?.id === p.id} onOpenChange={(open) => !open && setEditingMoneyOut(null)}>
                           <DialogTrigger render={<Button variant="ghost" size="icon" onClick={() => { setEditingMoneyOut(p); setEditMoneyOutForm({ amount: p.amount.toString(), date: p.date, notes: p.notes }) }} className="h-8 w-8 text-muted-foreground hover:text-indigo-400"><Edit3 className="w-4 h-4" /></Button>} />
@@ -381,7 +383,7 @@ export default function Cashbook() {
                             <DialogHeader><DialogTitle className="text-xl font-bold font-heading">Edit Record</DialogTitle></DialogHeader>
                             <form onSubmit={handleEditMoneyOutSubmit} className="space-y-4">
                               <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label>Amount ($)</Label><Input required type="number" value={editMoneyOutForm.amount} onChange={e => setEditMoneyOutForm({...editMoneyOutForm, amount: e.target.value})} className="rounded-xl border-border/40 bg-background/30 h-11" /></div>
+                                <div className="space-y-2"><Label>Amount ({symbol})</Label><Input required type="number" value={editMoneyOutForm.amount} onChange={e => setEditMoneyOutForm({...editMoneyOutForm, amount: e.target.value})} className="rounded-xl border-border/40 bg-background/30 h-11" /></div>
                                 <div className="space-y-2"><Label>Date</Label><Input type="date" required value={editMoneyOutForm.date} onChange={e => setEditMoneyOutForm({...editMoneyOutForm, date: e.target.value})} className="rounded-xl border-border/40 bg-background/30 h-11" /></div>
                               </div>
                               <div className="space-y-2"><Label>Details / Notes</Label><Input value={editMoneyOutForm.notes} onChange={e => setEditMoneyOutForm({...editMoneyOutForm, notes: e.target.value})} className="rounded-xl border-border/40 bg-background/30 h-11" /></div>

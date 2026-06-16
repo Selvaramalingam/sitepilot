@@ -88,7 +88,7 @@ export function PortalLayout({ title, role, navigation, children }: PortalLayout
     SITE_ENGINEER: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20 dark:bg-emerald-500/5'
   }
 
-  const profileHref = `/${role.toLowerCase().replace('_', '-')}/profile`
+  const profileHref = role === 'CONTRACTOR_OWNER' ? '/contractor/profile' : `/${role.toLowerCase().replace('_', '-')}/profile`
 
   const sidebarContent = (
     <div className="flex flex-col h-full bg-card border-r border-border/40">
@@ -183,10 +183,6 @@ export function PortalLayout({ title, role, navigation, children }: PortalLayout
 
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <div className="w-px h-6 bg-border/40 hidden sm:block" />
-            <div className="hidden sm:flex items-center gap-3">
-              <span className="text-xs text-muted-foreground font-mono">Supabase Sandbox</span>
-            </div>
           </div>
         </header>
 

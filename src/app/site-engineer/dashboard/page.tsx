@@ -134,7 +134,7 @@ export default function SiteEngineerDashboard() {
               </CardContent>
 
               <div className="border-t border-border/40 bg-muted/10 px-6 py-4 flex justify-end items-center rounded-b-2xl">
-                <Link href="/site-engineer/entries">
+                <Link href={`/site-engineer/entries?projectId=${p.id}`}>
                   <Button className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl gap-1 px-5 shadow shadow-indigo-500/10 text-xs font-semibold">
                     File Entry <ArrowRight className="w-3.5 h-3.5" />
                   </Button>

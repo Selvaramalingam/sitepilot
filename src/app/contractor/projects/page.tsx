@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
+import { useCurrency } from '@/hooks/useCurrency'
 
 interface Project {
   id: string
@@ -37,6 +38,7 @@ interface Project {
 
 export default function ContractorProjects() {
   const router = useRouter()
+  const { symbol } = useCurrency()
   const [contractor, setContractor] = useState<UserProfile | null>(null)
   const [engineers, setEngineers] = useState<UserProfile[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -333,7 +335,7 @@ export default function ContractorProjects() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="p-budget">Project Budget ($)</Label>
+                <Label htmlFor="p-budget">Project Budget ({symbol})</Label>
                 <Input 
                   id="p-budget" required type="number" placeholder="e.g. 250000"
                   className="rounded-xl border-border/40 bg-background/30 h-11"
@@ -431,7 +433,7 @@ export default function ContractorProjects() {
                         <div className="space-y-2"><Label>Target End Date</Label><Input type="date" required className="rounded-xl border-border/40 bg-background/30 h-11" value={editProjectForm.endDate} onChange={e => setEditProjectForm({...editProjectForm, endDate: e.target.value})} /></div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2"><Label>Project Budget ($)</Label><Input required type="number" className="rounded-xl border-border/40 bg-background/30 h-11" value={editProjectForm.budget} onChange={e => setEditProjectForm({...editProjectForm, budget: e.target.value})} /></div>
+                        <div className="space-y-2"><Label>Project Budget ({symbol})</Label><Input required type="number" className="rounded-xl border-border/40 bg-background/30 h-11" value={editProjectForm.budget} onChange={e => setEditProjectForm({...editProjectForm, budget: e.target.value})} /></div>
                         <div className="space-y-2">
                           <Label>Status</Label>
                           <select className="flex w-full rounded-xl border border-border/40 bg-background/30 px-3 h-11 text-sm focus-visible:outline-none" value={editProjectForm.status} onChange={(e: any) => setEditProjectForm({...editProjectForm, status: e.target.value})}>

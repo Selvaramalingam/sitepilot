@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
+import { useCurrency } from '@/hooks/useCurrency'
 
 interface Material {
   id: string
@@ -35,6 +36,7 @@ interface Material {
 
 export default function ContractorMaterials() {
   const router = useRouter()
+  const { symbol, formatCurrency } = useCurrency()
   const [contractor, setContractor] = useState<UserProfile | null>(null)
   const [projects, setProjects] = useState<any[]>([])
   const [suppliers, setSuppliers] = useState<any[]>([])
@@ -286,7 +288,7 @@ export default function ContractorMaterials() {
         <Card className="border border-border/40 bg-card/40 backdrop-blur-sm p-4 flex items-center justify-between">
           <div>
             <span className="text-xs text-muted-foreground font-semibold">Total Material Cost</span>
-            <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-indigo-500">${totalCost.toLocaleString()}</h3>
+            <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-indigo-500">{formatCurrency(totalCost)}</h3>
           </div>
           <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
             <DollarSign className="w-5 h-5" />
@@ -410,7 +412,7 @@ export default function ContractorMaterials() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="m-cost">Total Invoice Cost ($)</Label>
+                  <Label htmlFor="m-cost">Total Invoice Cost ({symbol})</Label>
                   <Input 
                     id="m-cost" required type="number" placeholder="4200"
                     className="rounded-xl border-border/40 bg-background/30 h-11"
@@ -473,7 +475,7 @@ export default function ContractorMaterials() {
                       <td className="px-6 py-4 font-medium">
                         {m.quantity.toLocaleString()} <span className="text-muted-foreground text-xs">{m.unit}</span>
                       </td>
-                      <td className="px-6 py-4 font-bold text-indigo-500">${m.cost.toLocaleString()}</td>
+                      <td className="px-6 py-4 font-bold text-indigo-500">{formatCurrency(m.cost)}</td>
                       <td className="px-6 py-4 text-muted-foreground">{m.date}</td>
                       <td className="px-6 py-4 text-right flex justify-end gap-1">
                         <Dialog open={editingMaterial?.id === m.id} onOpenChange={(open) => !open && setEditingMaterial(null)}>
@@ -518,7 +520,7 @@ export default function ContractorMaterials() {
                                 <Input required list="supplier-list" className="rounded-xl border-border/40 bg-background/30 h-11" value={editMaterialForm.supplier} onChange={e => setEditMaterialForm({...editMaterialForm, supplier: e.target.value})} />
                               </div>
                               <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2"><Label>Total Cost ($)</Label><Input required type="number" className="rounded-xl border-border/40 bg-background/30 h-11" value={editMaterialForm.cost} onChange={e => setEditMaterialForm({...editMaterialForm, cost: e.target.value})} /></div>
+                                <div className="space-y-2"><Label>Total Cost ({symbol})</Label><Input required type="number" className="rounded-xl border-border/40 bg-background/30 h-11" value={editMaterialForm.cost} onChange={e => setEditMaterialForm({...editMaterialForm, cost: e.target.value})} /></div>
                                 <div className="space-y-2"><Label>Delivery Date</Label><Input type="date" required className="rounded-xl border-border/40 bg-background/30 h-11" value={editMaterialForm.date} onChange={e => setEditMaterialForm({...editMaterialForm, date: e.target.value})} /></div>
                               </div>
                               <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-6 font-semibold mt-4">Save Changes</Button>

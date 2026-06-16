@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import React, { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,8 +10,11 @@ import { CheckCircle2, ShieldCheck, Plus, Camera, FileText, Settings } from 'luc
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
 
-export default function SiteEngineerEntries() {
+function EntriesContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialProjectId = searchParams.get('projectId') || ''
+  
   const [activeTab, setActiveTab] = useState<'material' | 'expense' | 'report'>('material')
   const [successMsg, setSuccessMsg] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
@@ -21,9 +24,9 @@ export default function SiteEngineerEntries() {
   const [loading, setLoading] = useState(true)
 
   // Form states
-  const [materialForm, setMaterialForm] = useState({ projectId: '', name: '', quantity: '', unit: 'Tons', supplier: '', cost: '', date: '' })
-  const [expenseForm, setExpenseForm] = useState({ projectId: '', category: 'Labour', amount: '', notes: '', date: '' })
-  const [reportForm, setReportForm] = useState({ projectId: '', date: '', completed: '', issues: '', notes: '' })
+  const [materialForm, setMaterialForm] = useState({ projectId: initialProjectId, name: '', quantity: '', unit: 'Tons', supplier: '', cost: '', date: '' })
+  const [expenseForm, setExpenseForm] = useState({ projectId: initialProjectId, category: 'Labour', amount: '', notes: '', date: '' })
+  const [reportForm, setReportForm] = useState({ projectId: initialProjectId, date: '', completed: '', issues: '', notes: '' })
 
   useEffect(() => {
     fetchSession()
@@ -55,7 +58,10 @@ export default function SiteEngineerEntries() {
       setAssignedProjects(dbProjects)
 
       if (dbProjects.length > 0) {
-        const defaultProjId = dbProjects[0].id
+        const defaultProjId = initialProjectId && dbProjects.find(p => p.id === initialProjectId) 
+          ? initialProjectId 
+          : dbProjects[0].id
+          
         setMaterialForm(prev => ({ ...prev, projectId: defaultProjId }))
         setExpenseForm(prev => ({ ...prev, projectId: defaultProjId }))
         setReportForm(prev => ({ ...prev, projectId: defaultProjId }))
@@ -528,5 +534,13 @@ export default function SiteEngineerEntries() {
         </Card>
       )}
     </div>
+  )
+}
+
+export default function SiteEngineerEntries() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <EntriesContent />
+    </Suspense>
   )
 }

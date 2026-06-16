@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
+import { useCurrency } from '@/hooks/useCurrency'
 
 interface Expense {
   id: string
@@ -35,6 +36,7 @@ interface Expense {
 
 export default function ContractorExpenses() {
   const router = useRouter()
+  const { symbol, formatCurrency } = useCurrency()
   const [contractor, setContractor] = useState<UserProfile | null>(null)
   const [projects, setProjects] = useState<any[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
@@ -225,7 +227,7 @@ export default function ContractorExpenses() {
         <Card className="border border-border/40 bg-card/40 backdrop-blur-sm p-4 flex items-center justify-between">
           <div>
             <span className="text-xs text-muted-foreground font-semibold">Total Expenses logged</span>
-            <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-indigo-500">${totalExpense.toLocaleString()}</h3>
+            <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-indigo-500">{formatCurrency(totalExpense)}</h3>
           </div>
           <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
             <DollarSign className="w-5 h-5" />
@@ -325,7 +327,7 @@ export default function ContractorExpenses() {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="e-amount">Amount ($)</Label>
+                  <Label htmlFor="e-amount">Amount ({symbol})</Label>
                   <Input 
                     id="e-amount" required type="number" placeholder="150"
                     className="rounded-xl border-border/40 bg-background/30 h-11"
@@ -397,7 +399,7 @@ export default function ContractorExpenses() {
                       </td>
                       <td className="px-6 py-4 text-muted-foreground">{e.projectName}</td>
                       <td className="px-6 py-4 text-xs max-w-xs truncate">{e.notes}</td>
-                      <td className="px-6 py-4 font-bold text-indigo-500">${e.amount.toLocaleString()}</td>
+                      <td className="px-6 py-4 font-bold text-indigo-500">{formatCurrency(e.amount)}</td>
                       <td className="px-6 py-4 text-muted-foreground">{e.date}</td>
                       <td className="px-6 py-4 text-right flex justify-end gap-1">
                         <Dialog open={editingExpense?.id === e.id} onOpenChange={(open) => !open && setEditingExpense(null)}>
@@ -432,7 +434,7 @@ export default function ContractorExpenses() {
                                     <option value="Miscellaneous">Miscellaneous</option>
                                   </select>
                                 </div>
-                                <div className="space-y-2"><Label>Amount ($)</Label><Input required type="number" className="rounded-xl border-border/40 bg-background/30 h-11" value={editExpenseForm.amount} onChange={ev => setEditExpenseForm({...editExpenseForm, amount: ev.target.value})} /></div>
+                                 <div className="space-y-2"><Label>Amount ({symbol})</Label><Input required type="number" className="rounded-xl border-border/40 bg-background/30 h-11" value={editExpenseForm.amount} onChange={ev => setEditExpenseForm({...editExpenseForm, amount: ev.target.value})} /></div>
                               </div>
                               <div className="space-y-2"><Label>Date</Label><Input type="date" required className="rounded-xl border-border/40 bg-background/30 h-11" value={editExpenseForm.date} onChange={ev => setEditExpenseForm({...editExpenseForm, date: ev.target.value})} /></div>
                               <div className="space-y-2">

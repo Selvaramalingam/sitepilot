@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle2, Calendar, Clock, Globe } from 'lucide-react'
+import { CheckCircle2, Calendar, Clock, Globe, ShieldAlert } from 'lucide-react'
 
 export default function BookDemoPage() {
   const [submitted, setSubmitted] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -19,9 +21,36 @@ export default function BookDemoPage() {
     time: ''
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSubmitted(true)
+    setLoading(true)
+    setError('')
+
+    const constructedMessage = `Requested a live 1-on-1 demo walkthrough.\nScheduled Date: ${formData.date}\nScheduled Time: ${formData.time}\nCompany Size: ${formData.size}`
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          company: formData.company,
+          message: constructedMessage
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to submit demo request.')
+      }
+
+      setSubmitted(true)
+    } catch (err: any) {
+      setError(err.message || 'An error occurred. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -61,6 +90,12 @@ export default function BookDemoPage() {
               <CardDescription>Select a date and time slot for your personalized tour.</CardDescription>
             </CardHeader>
             <CardContent>
+              {error && (
+                <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-xl p-3 mb-4 flex gap-2 items-center">
+                  <ShieldAlert className="h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
               {submitted ? (
                 <motion.div 
                   initial={{ scale: 0.95, opacity: 0 }}
@@ -149,8 +184,12 @@ export default function BookDemoPage() {
                       />
                     </div>
                   </div>
-                  <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-6 text-sm font-semibold shadow-lg shadow-indigo-500/20">
-                    Schedule Walkthrough
+                  <Button 
+                    type="submit" 
+                    disabled={loading} 
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-6 text-sm font-semibold shadow-lg shadow-indigo-500/20 disabled:opacity-50"
+                  >
+                    {loading ? 'Scheduling Walkthrough...' : 'Schedule Walkthrough'}
                   </Button>
                 </form>
               )}

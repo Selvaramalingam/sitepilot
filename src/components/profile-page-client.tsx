@@ -194,10 +194,6 @@ export function ProfilePageClient({ role }: ProfilePageClientProps) {
                 <span className="text-muted-foreground">Status</span>
                 <span className="font-semibold text-emerald-400">Active</span>
               </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-muted-foreground">Session Tier</span>
-                <span className="font-semibold text-indigo-400">Supabase Authenticated</span>
-              </div>
             </div>
           </CardContent>
         </Card>

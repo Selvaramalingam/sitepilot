@@ -2,12 +2,13 @@
 
 import React from 'react'
 import { PortalLayout, type NavigationItem } from '@/components/portal-layout'
-import { LayoutDashboard, Building2, CreditCard } from 'lucide-react'
+import { LayoutDashboard, Building2, CreditCard, Mail } from 'lucide-react'
 
 const navigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/super-admin/dashboard', icon: LayoutDashboard },
   { name: 'Companies', href: '/super-admin/companies', icon: Building2 },
-  { name: 'Subscriptions', href: '/super-admin/subscriptions', icon: CreditCard }
+  { name: 'Subscriptions', href: '/super-admin/subscriptions', icon: CreditCard },
+  { name: 'Inbox', href: '/super-admin/inbox', icon: Mail }
 ]
 
 export default function SuperAdminLayout({

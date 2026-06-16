@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
 export async function GET() {
   try {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabaseAdmin = getSupabaseAdmin()
     const { count, error } = await supabaseAdmin
       .from('users')
       .select('*', { count: 'exact', head: true })
@@ -26,10 +23,7 @@ export async function POST(req: Request) {
   try {
     const { email, password, fullName } = await req.json()
 
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabaseAdmin = getSupabaseAdmin()
 
     // Security Check: count existing super admins
     const { count, error: countError } = await supabaseAdmin

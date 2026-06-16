@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CheckCircle2, Mail, Phone, MapPin } from 'lucide-react'
+import { CheckCircle2, Mail, Phone, MapPin, ShieldAlert } from 'lucide-react'
 
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -18,10 +20,29 @@ export default function ContactPage() {
     message: ''
   })
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Mock Resend submit
-    setSubmitted(true)
+    setLoading(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      })
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send message.')
+      }
+
+      setSubmitted(true)
+    } catch (err: any) {
+      setError(err.message || 'An error occurred. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -67,6 +88,12 @@ export default function ContactPage() {
               <CardDescription>Fill out the form below and we will get back to you within 24 hours.</CardDescription>
             </CardHeader>
             <CardContent>
+              {error && (
+                <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-xl p-3 mb-4 flex gap-2 items-center">
+                  <ShieldAlert className="h-4 w-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
               {submitted ? (
                 <motion.div 
                   initial={{ scale: 0.95, opacity: 0 }}
@@ -140,8 +167,12 @@ export default function ContactPage() {
                       onChange={e => setFormData({...formData, message: e.target.value})}
                     />
                   </div>
-                  <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-6 text-sm font-semibold shadow-lg shadow-indigo-500/20">
-                    Send Message
+                  <Button 
+                    type="submit" 
+                    disabled={loading} 
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-6 text-sm font-semibold shadow-lg shadow-indigo-500/20 disabled:opacity-50"
+                  >
+                    {loading ? 'Sending Message...' : 'Send Message'}
                   </Button>
                 </form>
               )}

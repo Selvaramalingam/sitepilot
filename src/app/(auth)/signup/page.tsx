@@ -47,76 +47,19 @@ export default function SignupPage() {
     setLoading(true)
     setError('')
 
-    const cleanEmail = formData.email.toLowerCase().trim()
-    const supabase = createClient()
-
     try {
-      // 1. Verify email uniqueness
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('email', cleanEmail)
-        .maybeSingle()
-
-      if (existingUser) {
-        setError('An account with this email already exists.')
-        setLoading(false)
-        return
-      }
-
-      // 2. Create the company first (Public inserts are allowed to support signup workspace provision)
-      const expiry = new Date()
-      expiry.setDate(expiry.getDate() + 14) // 14-day trial
-      const expiryStr = expiry.toISOString().split('T')[0]
-
-      const { data: company, error: companyError } = await supabase
-        .from('companies')
-        .insert({
-          name: formData.companyName,
-          owner_email: cleanEmail,
-          subscription_plan_id: formData.planId,
-          status: 'Trial',
-          expiry_date: expiryStr
-        })
-        .select()
-        .single()
-
-      if (companyError || !company) {
-        setError(companyError?.message || 'Failed to initialize company workspace.')
-        setLoading(false)
-        return
-      }
-
-      // 3. Register Owner User in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password: formData.password,
-        options: {
-          data: {
-            role: 'CONTRACTOR_OWNER',
-            first_name: formData.ownerName,
-            company_id: company.id
-          }
-        }
+      const res = await fetch('/api/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
       })
 
-      if (authError || !authData.user) {
-        // Rollback Company insert to maintain consistency
-        await supabase.from('companies').delete().eq('id', company.id)
-        setError(authError?.message || 'Authentication setup failed.')
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || 'Failed to initialize company workspace.')
         setLoading(false)
         return
       }
-
-      // Log setup audit log (requires authenticated user context, but since signUp auto-authenticates, it's allowed)
-      await supabase.from('audit_logs').insert({
-        actor_id: authData.user.id,
-        actor_email: cleanEmail,
-        action: 'TENANT_SIGNUP',
-        entity_type: 'COMPANY',
-        entity_id: company.id,
-        metadata: { companyName: formData.companyName }
-      })
 
       setSubmitted(true)
     } catch (err: any) {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
 async function authenticateContractorOwner() {
   try {
@@ -32,10 +32,7 @@ export async function POST(req: Request) {
     const { fullName, email, password } = await req.json()
     const cleanEmail = email.toLowerCase().trim()
 
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabaseAdmin = getSupabaseAdmin()
 
     // Check email unique in public.users
     const { data: existing } = await supabaseAdmin.from('users').select('id').eq('email', cleanEmail)
@@ -88,10 +85,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Missing engineer ID.' }, { status: 400 })
     }
 
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabaseAdmin = getSupabaseAdmin()
 
     // Verify the site engineer belongs to the owner's company
     const { data: targetProfile, error: profileError } = await supabaseAdmin
@@ -138,10 +132,7 @@ export async function PUT(req: Request) {
     const { id, fullName, email, password } = await req.json()
     if (!id) return NextResponse.json({ error: 'Missing user ID' }, { status: 400 })
 
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabaseAdmin = getSupabaseAdmin()
 
     // Verify ownership
     const { data: targetProfile, error: profileError } = await supabaseAdmin

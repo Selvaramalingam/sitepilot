@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient as createServerClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { getSupabaseAdmin } from '@/lib/supabase/admin'
 
 async function authenticateSuperAdmin() {
   try {
@@ -32,10 +32,7 @@ export async function POST(req: Request) {
     const { name, ownerName, email, password, planId, phone } = await req.json()
     const cleanEmail = email.toLowerCase().trim()
 
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabaseAdmin = getSupabaseAdmin()
 
     // Check if email already taken in auth.users
     const { data: existingUsers } = await supabaseAdmin.from('users').select('id').eq('email', cleanEmail)
@@ -111,10 +108,7 @@ export async function PUT(req: Request) {
     const { id, name, ownerName, email, password, planId, status, expiry, phone } = await req.json()
     const cleanEmail = email.toLowerCase().trim()
 
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabaseAdmin = getSupabaseAdmin()
 
     // 1. Fetch current owner profile
     const { data: ownerProfile } = await supabaseAdmin
@@ -209,10 +203,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Missing company ID.' }, { status: 400 })
     }
 
-    const supabaseAdmin = createAdminClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    const supabaseAdmin = getSupabaseAdmin()
 
     // 1. Delete linked Auth users associated with this company
     const { data: companyUsers } = await supabaseAdmin

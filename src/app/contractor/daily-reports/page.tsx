@@ -130,12 +130,21 @@ export default function ContractorDailyReports() {
         notes: formData.notes
       }
 
+      let saveError = null
       if (editingReport) {
-        await supabase.from('daily_reports').update(payload).eq('id', editingReport.id)
+        const { error } = await supabase.from('daily_reports').update(payload).eq('id', editingReport.id)
+        saveError = error
       } else {
-        await supabase.from('daily_reports').insert([payload])
+        const { error } = await supabase.from('daily_reports').insert([payload])
+        saveError = error
       }
       
+      if (saveError) {
+        console.error('Supabase error:', saveError)
+        alert('Failed to save report: ' + saveError.message)
+        return
+      }
+
       setIsCreateOpen(false)
       setEditingReport(null)
       setFormData({

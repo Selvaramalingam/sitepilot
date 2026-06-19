@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
 import { ShieldAlert, Plus, Trash2, User, Mail, Search, ShieldCheck, Edit3, ExternalLink } from 'lucide-react'
@@ -26,6 +26,7 @@ export default function EngineersPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
 
   // Edit fields
   const [editingEngineer, setEditingEngineer] = useState<UserProfile | null>(null)
@@ -107,6 +108,7 @@ export default function EngineersPage() {
       
       setSuccess('Site Engineer registered successfully!')
       loadEngineers(contractor.company_id)
+      setIsCreateOpen(false)
     } catch (err: any) {
       setError(err.message || 'An error occurred.')
     } finally {
@@ -187,6 +189,78 @@ export default function EngineersPage() {
             Deploy site engineers to field projects and configure login access credentials.
           </p>
         </div>
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-500/20 gap-2 w-full md:w-auto py-5">
+              <Plus className="h-4.5 w-4.5" /> Add Engineer
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[450px] rounded-2xl bg-card border-border/40">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold font-heading">Register New Engineer</DialogTitle>
+              <CardDescription>Create credentials for a new site engineer.</CardDescription>
+            </DialogHeader>
+            {error && (
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-xl p-3 mb-4 flex gap-2 items-center">
+                <ShieldAlert className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+            {success && (
+              <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm rounded-xl p-3 mb-4 flex gap-2 items-center">
+                <ShieldCheck className="h-4 w-4 shrink-0" />
+                <span>{success}</span>
+              </div>
+            )}
+            <form onSubmit={handleCreateEngineer} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="fullName">Full Name</Label>
+                <Input 
+                  id="fullName" 
+                  required 
+                  placeholder="E.g., Alan Turing"
+                  className="rounded-xl h-11 border-border/40 bg-background/30 backdrop-blur-md focus:border-indigo-500/50 focus:ring-indigo-500/50"
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="email">Email Address</Label>
+                <Input 
+                  id="email" 
+                  type="email"
+                  required 
+                  placeholder="alan@company.com"
+                  className="rounded-xl h-11 border-border/40 bg-background/30 backdrop-blur-md focus:border-indigo-500/50 focus:ring-indigo-500/50"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="password">Login Password</Label>
+                <Input 
+                  id="password" 
+                  type="password"
+                  required 
+                  placeholder="••••••••"
+                  className="rounded-xl h-11 border-border/40 bg-background/30 backdrop-blur-md focus:border-indigo-500/50 focus:ring-indigo-500/50"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                />
+              </div>
+
+              <Button 
+                type="submit" 
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl py-5 text-sm font-semibold shadow-lg shadow-indigo-500/20 transition-all duration-300 mt-4"
+              >
+                {loading ? 'Registering...' : 'Register Engineer'}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Dialog open={!!editingEngineer} onOpenChange={(open) => !open && setEditingEngineer(null)}>
@@ -239,87 +313,7 @@ export default function EngineersPage() {
         </DialogContent>
       </Dialog>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left column: Add Engineer Form */}
-        <div className="lg:col-span-1">
-          <Card className="glass-card border-none rounded-2xl shadow-xl">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold flex items-center gap-2">
-                <Plus className="w-5 h-5 text-indigo-400" />
-                Register Engineer
-              </CardTitle>
-              <CardDescription>
-                Create new credentials for a site engineer under your company.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {error && (
-                <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-xl p-3 mb-4 flex gap-2 items-center">
-                  <ShieldAlert className="h-4 w-4 shrink-0" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {success && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm rounded-xl p-3 mb-4 flex gap-2 items-center">
-                  <ShieldCheck className="h-4 w-4 shrink-0" />
-                  <span>{success}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleCreateEngineer} className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="fullName">Full Name</Label>
-                  <Input 
-                    id="fullName" 
-                    required 
-                    placeholder="E.g., Alan Turing"
-                    className="rounded-xl h-11 border-border/40 bg-background/30 backdrop-blur-md focus:border-indigo-500/50 focus:ring-indigo-500/50"
-                    value={fullName}
-                    onChange={e => setFullName(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input 
-                    id="email" 
-                    type="email"
-                    required 
-                    placeholder="alan@company.com"
-                    className="rounded-xl h-11 border-border/40 bg-background/30 backdrop-blur-md focus:border-indigo-500/50 focus:ring-indigo-500/50"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="password">Login Password</Label>
-                  <Input 
-                    id="password" 
-                    type="password"
-                    required 
-                    placeholder="••••••••"
-                    className="rounded-xl h-11 border-border/40 bg-background/30 backdrop-blur-md focus:border-indigo-500/50 focus:ring-indigo-500/50"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                  />
-                </div>
-
-                <Button 
-                  type="submit" 
-                  disabled={loading}
-                  className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl py-5 text-sm font-semibold shadow-lg shadow-indigo-500/20 transition-all duration-300"
-                >
-                  {loading ? 'Registering...' : 'Register Engineer'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right column: List of Engineers */}
-        <div className="lg:col-span-2 space-y-4">
+      <div className="space-y-4">
           <div className="relative">
             <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-muted-foreground pointer-events-none">
               <Search className="h-4.5 w-4.5" />
@@ -395,8 +389,6 @@ export default function EngineersPage() {
                       </div>
                     </div>
                   ))}
-                </div>
-              )}
             </CardContent>
           </Card>
         </div>

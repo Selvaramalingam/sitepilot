@@ -17,7 +17,8 @@ import {
   Search,
   CheckCircle2,
   AlertCircle,
-  Edit3
+  Edit3,
+  Trash2
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
@@ -127,6 +128,28 @@ export default function ContractorProjects() {
       console.error(e)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDeleteProject = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this project? This will also remove associated assignments and reports.')) return
+    if (!contractor?.company_id) return
+
+    try {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', id)
+
+      if (error) {
+        alert('Failed to delete project: ' + error.message)
+        return
+      }
+
+      loadData(contractor.company_id)
+    } catch (err) {
+      console.error(err)
     }
   }
 
@@ -503,6 +526,15 @@ export default function ContractorProjects() {
                 >
                   <FolderArchive className="h-3.5 w-3.5" />
                   <span>{p.status === 'Archived' ? 'Activate' : 'Archive'}</span>
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => handleDeleteProject(p.id)}
+                  className="rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Delete</span>
                 </Button>
               </div>
             </Card>

@@ -190,11 +190,11 @@ export default function EngineersPage() {
           </p>
         </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
+          <DialogTrigger render={
             <Button className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-lg shadow-indigo-500/20 gap-2 w-full md:w-auto py-5">
               <Plus className="h-4.5 w-4.5" /> Add Engineer
             </Button>
-          </DialogTrigger>
+          } />
           <DialogContent className="sm:max-w-[450px] rounded-2xl bg-card border-border/40">
             <DialogHeader>
               <DialogTitle className="text-xl font-bold font-heading">Register New Engineer</DialogTitle>
@@ -393,7 +393,6 @@ export default function EngineersPage() {
               )}
             </CardContent>
           </Card>
-        </div>
       </div>
     </div>
   )

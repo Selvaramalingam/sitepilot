@@ -412,11 +412,58 @@ export default function ContractorProjects() {
                 </div>
 
                 {/* Assigned site engineer block */}
-                <div className="p-3 rounded-xl bg-muted/30 border border-border/20 space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Assigned Engineer</span>
-                  <p className="text-xs font-bold text-foreground truncate">{p.engineer}</p>
+                <div className="p-3 rounded-xl bg-muted/30 border border-border/20 flex items-center justify-between gap-2">
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider block">Assigned Engineer</span>
+                    <p className="text-xs font-bold text-foreground truncate">{p.engineer}</p>
+                  </div>
+                  {/* Assign Engineer Dialog Overlay */}
+                  <Dialog open={assigningProject?.id === p.id} onOpenChange={(open) => !open && setAssigningProject(null)}>
+                    <DialogTrigger render={
+                      <Button 
+                        variant="ghost" 
+                        size="icon-sm"
+                        onClick={() => {
+                          setAssigningProject(p)
+                          setSelectedEngineer(p.engineerId || 'Unassigned')
+                        }}
+                        className="rounded-lg text-muted-foreground hover:text-indigo-400 hover:bg-indigo-500/10 h-7 w-7 flex items-center justify-center shrink-0 border border-border/20"
+                        title="Assign/Change Site Engineer"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" />
+                      </Button>
+                    } />
+                    <DialogContent className="sm:max-w-[400px] rounded-2xl bg-card border-border/40">
+                      <DialogHeader>
+                        <DialogTitle className="text-xl font-bold font-heading">Assign Site Engineer</DialogTitle>
+                        <CardDescription>Select an engineer from your registered company profiles.</CardDescription>
+                      </DialogHeader>
+                      <form onSubmit={handleAssignEngineer} className="space-y-4 mt-2">
+                        <div className="space-y-2">
+                          <Label htmlFor={`eng-select-${p.id}`}>Registered Site Engineers</Label>
+                          <select
+                            id={`eng-select-${p.id}`}
+                            className="flex w-full rounded-xl border border-border bg-background px-3 h-11 text-sm focus-visible:outline-none"
+                            value={selectedEngineer}
+                            onChange={e => setSelectedEngineer(e.target.value)}
+                          >
+                            <option value="Unassigned">Unassigned</option>
+                            {engineers.map(eng => (
+                              <option key={eng.id} value={eng.id}>
+                                {eng.full_name} ({eng.email})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-6 font-semibold mt-4">
+                          Update Assignment
+                        </Button>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
                 </div>
-              </CardContent>              <div className="border-t border-border/40 bg-muted/10 px-6 py-4 flex justify-between items-center rounded-b-2xl">
+              </CardContent>
+              <div className="border-t border-border/40 bg-muted/10 p-3 grid grid-cols-3 gap-2 rounded-b-2xl">
                 {/* Edit Project Dialog Overlay */}
                 <Dialog open={editingProject?.id === p.id} onOpenChange={(open) => !open && setEditingProject(null)}>
                   <DialogTrigger render={
@@ -429,9 +476,10 @@ export default function ContractorProjects() {
                           name: p.name, client: p.client, address: p.address, startDate: p.startDate, endDate: p.endDate, status: p.status, budget: p.budget.toString()
                         })
                       }}
-                      className="rounded-lg border-border/40 hover:bg-muted/80 gap-1.5"
+                      className="rounded-lg border-border/40 hover:bg-muted/80 gap-1.5 justify-center w-full h-9 px-2"
                     >
-                      <Edit3 className="h-3.5 w-3.5 text-indigo-500" /> Edit
+                      <Edit3 className="h-3.5 w-3.5 text-indigo-500" />
+                      <span className="text-xs">Edit</span>
                     </Button>
                   } />
                   <DialogContent className="sm:max-w-[450px] rounded-2xl bg-card border-border/40">
@@ -440,26 +488,35 @@ export default function ContractorProjects() {
                     </DialogHeader>
                     <form onSubmit={handleEditProjectSubmit} className="space-y-4 mt-2">
                       <div className="space-y-2">
-                        <Label>Project Name</Label>
-                        <Input required className="rounded-xl border-border/40 bg-background/30 h-11" value={editProjectForm.name} onChange={e => setEditProjectForm({...editProjectForm, name: e.target.value})} />
+                        <Label htmlFor={`edit-name-${p.id}`}>Project Name</Label>
+                        <Input id={`edit-name-${p.id}`} required className="rounded-xl border-border/40 bg-background/30 h-11" value={editProjectForm.name} onChange={e => setEditProjectForm({...editProjectForm, name: e.target.value})} />
                       </div>
                       <div className="space-y-2">
-                        <Label>Client / Authority Name</Label>
-                        <Input required className="rounded-xl border-border/40 bg-background/30 h-11" value={editProjectForm.client} onChange={e => setEditProjectForm({...editProjectForm, client: e.target.value})} />
+                        <Label htmlFor={`edit-client-${p.id}`}>Client / Authority Name</Label>
+                        <Input id={`edit-client-${p.id}`} required className="rounded-xl border-border/40 bg-background/30 h-11" value={editProjectForm.client} onChange={e => setEditProjectForm({...editProjectForm, client: e.target.value})} />
                       </div>
                       <div className="space-y-2">
-                        <Label>Site Location Address</Label>
-                        <Input required className="rounded-xl border-border/40 bg-background/30 h-11" value={editProjectForm.address} onChange={e => setEditProjectForm({...editProjectForm, address: e.target.value})} />
+                        <Label htmlFor={`edit-address-${p.id}`}>Site Location Address</Label>
+                        <Input id={`edit-address-${p.id}`} required className="rounded-xl border-border/40 bg-background/30 h-11" value={editProjectForm.address} onChange={e => setEditProjectForm({...editProjectForm, address: e.target.value})} />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2"><Label>Start Date</Label><Input type="date" required className="rounded-xl border-border/40 bg-background/30 h-11" value={editProjectForm.startDate} onChange={e => setEditProjectForm({...editProjectForm, startDate: e.target.value})} /></div>
-                        <div className="space-y-2"><Label>Target End Date</Label><Input type="date" required className="rounded-xl border-border/40 bg-background/30 h-11" value={editProjectForm.endDate} onChange={e => setEditProjectForm({...editProjectForm, endDate: e.target.value})} /></div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2"><Label>Project Budget ({symbol})</Label><Input required type="number" className="rounded-xl border-border/40 bg-background/30 h-11" value={editProjectForm.budget} onChange={e => setEditProjectForm({...editProjectForm, budget: e.target.value})} /></div>
                         <div className="space-y-2">
-                          <Label>Status</Label>
-                          <select className="flex w-full rounded-xl border border-border/40 bg-background/30 px-3 h-11 text-sm focus-visible:outline-none" value={editProjectForm.status} onChange={(e: any) => setEditProjectForm({...editProjectForm, status: e.target.value})}>
+                          <Label htmlFor={`edit-start-${p.id}`}>Start Date</Label>
+                          <Input id={`edit-start-${p.id}`} type="date" required className="rounded-xl border-border/40 bg-background/30 h-11" value={editProjectForm.startDate} onChange={e => setEditProjectForm({...editProjectForm, startDate: e.target.value})} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`edit-end-${p.id}`}>Target End Date</Label>
+                          <Input id={`edit-end-${p.id}`} type="date" required className="rounded-xl border-border/40 bg-background/30 h-11" value={editProjectForm.endDate} onChange={e => setEditProjectForm({...editProjectForm, endDate: e.target.value})} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor={`edit-budget-${p.id}`}>Project Budget ({symbol})</Label>
+                          <Input id={`edit-budget-${p.id}`} required type="number" className="rounded-xl border-border/40 bg-background/30 h-11" value={editProjectForm.budget} onChange={e => setEditProjectForm({...editProjectForm, budget: e.target.value})} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor={`edit-status-${p.id}`}>Status</Label>
+                          <select id={`edit-status-${p.id}`} className="flex w-full rounded-xl border border-border/40 bg-background/30 px-3 h-11 text-sm focus-visible:outline-none" value={editProjectForm.status} onChange={(e: any) => setEditProjectForm({...editProjectForm, status: e.target.value})}>
                             <option value="Planning">Planning</option>
                             <option value="Active">Active</option>
                             <option value="Delayed">Delayed</option>
@@ -474,67 +531,24 @@ export default function ContractorProjects() {
                   </DialogContent>
                 </Dialog>
 
-                {/* Assign Engineer Dialog Overlay */}
-                <Dialog open={assigningProject?.id === p.id} onOpenChange={(open) => !open && setAssigningProject(null)}>
-                  <DialogTrigger render={
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => {
-                        setAssigningProject(p)
-                        setSelectedEngineer(p.engineerId || 'Unassigned')
-                      }}
-                      className="rounded-lg border-border/40 hover:bg-muted/80 gap-1.5"
-                    >
-                      <UserPlus className="h-3.5 w-3.5 text-indigo-500" /> Assign Engineer
-                    </Button>
-                  } />
-                  <DialogContent className="sm:max-w-[400px] rounded-2xl bg-card border-border/40">
-                    <DialogHeader>
-                      <DialogTitle className="text-xl font-bold font-heading">Assign Site Engineer</DialogTitle>
-                      <CardDescription>Select an engineer from your registered company profiles.</CardDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleAssignEngineer} className="space-y-4 mt-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="eng-select">Registered Site Engineers</Label>
-                        <select
-                          id="eng-select"
-                          className="flex w-full rounded-xl border border-border bg-background px-3 h-11 text-sm focus-visible:outline-none"
-                          value={selectedEngineer}
-                          onChange={e => setSelectedEngineer(e.target.value)}
-                        >
-                          <option value="Unassigned">Unassigned</option>
-                          {engineers.map(eng => (
-                            <option key={eng.id} value={eng.id}>
-                              {eng.full_name} ({eng.email})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-6 font-semibold mt-4">
-                        Update Assignment
-                      </Button>
-                    </form>
-                  </DialogContent>
-                </Dialog>
-
                 <Button 
-                  variant="ghost" 
+                  variant="outline" 
                   size="sm"
                   onClick={() => toggleArchive(p.id, p.status)}
-                  className="rounded-lg text-muted-foreground hover:text-indigo-500 hover:bg-indigo-500/10 gap-1"
+                  className="rounded-lg border border-border/40 hover:bg-muted/80 gap-1.5 justify-center w-full h-9 px-2 text-muted-foreground hover:text-indigo-500"
                 >
-                  <FolderArchive className="h-3.5 w-3.5" />
-                  <span>{p.status === 'Archived' ? 'Activate' : 'Archive'}</span>
+                  <FolderArchive className="h-3.5 w-3.5 text-indigo-500" />
+                  <span className="text-xs">{p.status === 'Archived' ? 'Activate' : 'Archive'}</span>
                 </Button>
+                
                 <Button 
-                  variant="ghost" 
+                  variant="outline" 
                   size="sm"
                   onClick={() => handleDeleteProject(p.id)}
-                  className="rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1"
+                  className="rounded-lg border border-border/40 hover:bg-muted/80 gap-1.5 justify-center w-full h-9 px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span>Delete</span>
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  <span className="text-xs">Delete</span>
                 </Button>
               </div>
             </Card>

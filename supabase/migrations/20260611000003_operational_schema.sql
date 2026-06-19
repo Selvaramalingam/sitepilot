@@ -170,8 +170,9 @@ CREATE POLICY "Contractor Owners full control on company supplier payments" ON p
 CREATE POLICY "Super Admin full control on daily reports" ON public.daily_reports 
   FOR ALL USING (public.is_super_admin(auth.uid()));
 
-CREATE POLICY "Contractor Owners view company daily reports" ON public.daily_reports 
-  FOR SELECT USING (public.project_belongs_to_company(project_id, public.get_user_company_id(auth.uid())));
+CREATE POLICY "Contractor Owners full control on company daily reports" ON public.daily_reports 
+  FOR ALL USING (public.project_belongs_to_company(project_id, public.get_user_company_id(auth.uid())))
+  WITH CHECK (public.project_belongs_to_company(project_id, public.get_user_company_id(auth.uid())));
 
 CREATE POLICY "Site Engineers manage daily reports on assigned projects" ON public.daily_reports 
   FOR ALL USING (public.is_assigned_to_project(auth.uid(), project_id))

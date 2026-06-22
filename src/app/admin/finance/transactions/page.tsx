@@ -1,27 +1,200 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { useCurrency } from '@/hooks/useCurrency'
 import { 
   ArrowUpRight, 
   ArrowDownRight, 
   ArrowRightLeft, 
-  Plus, 
   Search,
   Trash2,
-  FileText
+  ChevronDown,
+  Plus,
+  Check,
+  X
 } from 'lucide-react'
 
+// ──────────────────────────────────────────────────────────────
+// Inline-Create Combobox
+// Allows selecting an existing option OR typing a new name to create
+// ──────────────────────────────────────────────────────────────
+interface ComboOption { id: string; name: string }
+
+function CreatableCombobox({
+  label,
+  value,
+  options,
+  placeholder = 'Select or type to create...',
+  noneLabel = 'None / N/A',
+  allowNone = true,
+  required = false,
+  onCreate,
+  onChange,
+}: {
+  label?: string
+  value: string
+  options: ComboOption[]
+  placeholder?: string
+  noneLabel?: string
+  allowNone?: boolean
+  required?: boolean
+  onCreate: (name: string) => Promise<ComboOption | null>
+  onChange: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [creating, setCreating] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const selectedLabel = value === '' 
+    ? noneLabel 
+    : options.find(o => o.id === value)?.name ?? ''
+
+  const filtered = options.filter(o => o.name.toLowerCase().includes(query.toLowerCase()))
+  const showCreate = query.trim().length > 0 && !options.some(o => o.name.toLowerCase() === query.toLowerCase().trim())
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setQuery('')
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const handleOpen = () => {
+    setOpen(true)
+    setQuery('')
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
+  const handleSelect = (id: string) => {
+    onChange(id)
+    setOpen(false)
+    setQuery('')
+  }
+
+  const handleCreate = async () => {
+    const name = query.trim()
+    if (!name) return
+    setCreating(true)
+    try {
+      const created = await onCreate(name)
+      if (created) {
+        onChange(created.id)
+        setOpen(false)
+        setQuery('')
+      }
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      {label && <Label>{label}</Label>}
+      <div ref={containerRef} className="relative">
+        {/* Trigger button */}
+        <button
+          type="button"
+          onClick={open ? () => { setOpen(false); setQuery('') } : handleOpen}
+          className={`flex w-full items-center justify-between rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500/50 hover:border-border/70 transition-colors ${required && !value && 'border-red-500/50'}`}
+        >
+          <span className={value === '' ? 'text-muted-foreground' : 'text-foreground'}>
+            {open ? (query || selectedLabel) : (selectedLabel || placeholder)}
+          </span>
+          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+
+        {/* Dropdown */}
+        {open && (
+          <div className="absolute z-50 mt-1 w-full rounded-xl border border-border/40 bg-popover shadow-xl overflow-hidden">
+            {/* Search input */}
+            <div className="p-2 border-b border-border/40">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); if (showCreate) handleCreate() }
+                    if (e.key === 'Escape') { setOpen(false); setQuery('') }
+                  }}
+                  placeholder="Search or type new name..."
+                  className="w-full pl-7 pr-3 py-1.5 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
+                />
+              </div>
+            </div>
+
+            {/* Options list */}
+            <div className="max-h-48 overflow-y-auto py-1">
+              {allowNone && (
+                <button
+                  type="button"
+                  onClick={() => handleSelect('')}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors text-muted-foreground ${value === '' ? 'bg-muted/30' : ''}`}
+                >
+                  <X className="w-3.5 h-3.5 opacity-50 shrink-0" />
+                  {noneLabel}
+                </button>
+              )}
+
+              {filtered.length === 0 && !showCreate && (
+                <p className="px-3 py-3 text-xs text-muted-foreground text-center">No matches found</p>
+              )}
+
+              {filtered.map(o => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => handleSelect(o.id)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors ${value === o.id ? 'bg-muted/30 font-semibold' : ''}`}
+                >
+                  {value === o.id ? <Check className="w-3.5 h-3.5 text-indigo-500 shrink-0" /> : <span className="w-3.5 h-3.5 shrink-0" />}
+                  {o.name}
+                </button>
+              ))}
+
+              {/* Create new option */}
+              {showCreate && (
+                <button
+                  type="button"
+                  disabled={creating}
+                  onClick={handleCreate}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-indigo-400 hover:bg-indigo-500/10 font-semibold transition-colors border-t border-border/40"
+                >
+                  <Plus className="w-3.5 h-3.5 shrink-0" />
+                  {creating ? 'Creating...' : `Create "${query.trim()}"`}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────
+// Main Page
+// ──────────────────────────────────────────────────────────────
 export default function FinanceTransactionsPage() {
   const { symbol, formatCurrency } = useCurrency()
   const [loading, setLoading] = useState(true)
+  const [companyId, setCompanyId] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   
   const [transactions, setTransactions] = useState<any[]>([])
   const [accounts, setAccounts] = useState<any[]>([])
@@ -49,8 +222,10 @@ export default function FinanceTransactionsPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+      setUserId(user.id)
       const { data: profile } = await supabase.from('users').select('company_id').eq('id', user.id).single()
       if (!profile || !profile.company_id) return
+      setCompanyId(profile.company_id)
       
       const [acc, cat, ven, tx] = await Promise.all([
         supabase.from('finance_accounts').select('*').eq('company_id', profile.company_id).order('name'),
@@ -73,6 +248,48 @@ export default function FinanceTransactionsPage() {
       setLoading(false)
     }
   }
+
+  // ── Inline create helpers ──
+
+  const createVendor = async (name: string): Promise<{ id: string; name: string } | null> => {
+    if (!companyId || !name.trim()) return null
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('finance_vendors')
+        .insert({ company_id: companyId, name: name.trim() })
+        .select('id, name')
+        .single()
+      if (error) throw error
+      setVendors(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
+      return data
+    } catch (e) {
+      console.error(e)
+      alert('Failed to create vendor')
+      return null
+    }
+  }
+
+  const createCategory = async (name: string): Promise<{ id: string; name: string } | null> => {
+    if (!companyId || !name.trim()) return null
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('finance_categories')
+        .insert({ company_id: companyId, name: name.trim(), type: txType, is_active: true })
+        .select('id, name, type')
+        .single()
+      if (error) throw error
+      setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
+      return data
+    } catch (e) {
+      console.error(e)
+      alert('Failed to create category')
+      return null
+    }
+  }
+
+  // ── Dialog open ──
 
   const handleOpenDialog = (type: string) => {
     setTxType(type)
@@ -137,11 +354,13 @@ export default function FinanceTransactionsPage() {
     return searchMatch && typeMatch
   })
 
+  const filteredCategoriesForType = categories.filter(c => c.type === txType)
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
-          <h3 className="text-xl font-bold font-heading">Ledger & Transactions</h3>
+          <h3 className="text-xl font-bold font-heading">Ledger &amp; Transactions</h3>
           <p className="text-sm text-muted-foreground">Log all income, expenses, and bank transfers.</p>
         </div>
         
@@ -167,58 +386,99 @@ export default function FinanceTransactionsPage() {
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+
+              {/* Account row */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>{txType === 'TRANSFER' ? 'From Account' : 'Account'}</Label>
-                  <select required className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus:outline-none" value={formData.accountId} onChange={e => setFormData({...formData, accountId: e.target.value})}>
+                  <select
+                    required
+                    className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus:outline-none"
+                    value={formData.accountId}
+                    onChange={e => setFormData({...formData, accountId: e.target.value})}
+                  >
                     {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({formatCurrency(a.balance)})</option>)}
                   </select>
                 </div>
+
                 {txType === 'TRANSFER' && (
                   <div className="space-y-2">
                     <Label>To Account</Label>
-                    <select required className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus:outline-none" value={formData.toAccountId} onChange={e => setFormData({...formData, toAccountId: e.target.value})}>
+                    <select
+                      required
+                      className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus:outline-none"
+                      value={formData.toAccountId}
+                      onChange={e => setFormData({...formData, toAccountId: e.target.value})}
+                    >
                       <option value="">Select Destination</option>
                       {accounts.filter(a => a.id !== formData.accountId).map(a => <option key={a.id} value={a.id}>{a.name} ({formatCurrency(a.balance)})</option>)}
                     </select>
                   </div>
                 )}
+
                 {txType !== 'TRANSFER' && (
-                  <div className="space-y-2">
-                    <Label>Category</Label>
-                    <select required className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus:outline-none" value={formData.categoryId} onChange={e => setFormData({...formData, categoryId: e.target.value})}>
-                      <option value="">Select Category</option>
-                      {categories.filter(c => c.type === txType).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
+                  <CreatableCombobox
+                    label="Category"
+                    value={formData.categoryId}
+                    options={filteredCategoriesForType}
+                    placeholder="Select or create category..."
+                    noneLabel="No Category"
+                    allowNone={false}
+                    required
+                    onCreate={createCategory}
+                    onChange={id => setFormData({...formData, categoryId: id})}
+                  />
                 )}
               </div>
 
+              {/* Amount + Date */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Amount ({symbol})</Label>
-                  <Input type="number" step="0.01" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} className="rounded-xl bg-background/50" />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={formData.amount}
+                    onChange={e => setFormData({...formData, amount: e.target.value})}
+                    className="rounded-xl bg-background/50"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Date</Label>
-                  <Input type="date" required value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="rounded-xl bg-background/50" />
+                  <Input
+                    type="date"
+                    required
+                    value={formData.date}
+                    onChange={e => setFormData({...formData, date: e.target.value})}
+                    className="rounded-xl bg-background/50"
+                  />
                 </div>
               </div>
 
+              {/* Vendor — creatable combobox */}
               {txType !== 'TRANSFER' && (
-                <div className="space-y-2">
-                  <Label>Vendor / Payee</Label>
-                  <select className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus:outline-none" value={formData.vendorId} onChange={e => setFormData({...formData, vendorId: e.target.value})}>
-                    <option value="">None / N/A</option>
-                    {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
-                  </select>
-                </div>
+                <CreatableCombobox
+                  label="Vendor / Payee"
+                  value={formData.vendorId}
+                  options={vendors}
+                  placeholder="Select vendor or type to create new..."
+                  noneLabel="None / N/A"
+                  allowNone={true}
+                  onCreate={createVendor}
+                  onChange={id => setFormData({...formData, vendorId: id})}
+                />
               )}
 
+              {/* Payment method + Reference */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Payment Method</Label>
-                  <select className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus:outline-none" value={formData.method} onChange={e => setFormData({...formData, method: e.target.value})}>
+                  <select
+                    className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus:outline-none"
+                    value={formData.method}
+                    onChange={e => setFormData({...formData, method: e.target.value})}
+                  >
                     <option value="Bank Transfer">Bank Transfer</option>
                     <option value="Cash">Cash</option>
                     <option value="Cheque">Cheque</option>
@@ -228,19 +488,34 @@ export default function FinanceTransactionsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Reference Number</Label>
-                  <Input value={formData.reference} onChange={e => setFormData({...formData, reference: e.target.value})} className="rounded-xl bg-background/50" placeholder="Txn ID, Cheque No." />
+                  <Input
+                    value={formData.reference}
+                    onChange={e => setFormData({...formData, reference: e.target.value})}
+                    className="rounded-xl bg-background/50"
+                    placeholder="Txn ID, Cheque No."
+                  />
                 </div>
               </div>
 
+              {/* Notes */}
               <div className="space-y-2">
                 <Label>Notes</Label>
-                <Input value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="rounded-xl bg-background/50" placeholder="Additional details..." />
+                <Input
+                  value={formData.notes}
+                  onChange={e => setFormData({...formData, notes: e.target.value})}
+                  className="rounded-xl bg-background/50"
+                  placeholder="Additional details..."
+                />
               </div>
 
-              <Button type="submit" disabled={isSubmitting} className={`w-full text-white rounded-xl py-6 mt-4 ${
-                txType === 'INCOME' ? 'bg-emerald-600 hover:bg-emerald-500' : 
-                txType === 'EXPENSE' ? 'bg-pink-600 hover:bg-pink-500' : 'bg-indigo-600 hover:bg-indigo-500'
-              }`}>
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className={`w-full text-white rounded-xl py-6 mt-4 ${
+                  txType === 'INCOME' ? 'bg-emerald-600 hover:bg-emerald-500' : 
+                  txType === 'EXPENSE' ? 'bg-pink-600 hover:bg-pink-500' : 'bg-indigo-600 hover:bg-indigo-500'
+                }`}
+              >
                 {isSubmitting ? 'Saving...' : 'Save Transaction'}
               </Button>
             </form>
@@ -248,6 +523,7 @@ export default function FinanceTransactionsPage() {
         </Dialog>
       </div>
 
+      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -270,6 +546,7 @@ export default function FinanceTransactionsPage() {
         </select>
       </div>
 
+      {/* Transactions table */}
       <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
         <CardContent className="p-0 overflow-x-auto">
           <table className="w-full text-left border-collapse whitespace-nowrap">

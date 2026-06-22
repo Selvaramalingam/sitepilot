@@ -40,7 +40,9 @@ export default function FinanceLayout({
       <div className="flex overflow-x-auto border-b border-border/40 pb-px hide-scrollbar">
         <div className="flex space-x-1 min-w-max">
           {navItems.map((item) => {
-            const isActive = pathname === item.href
+            const isActive = item.href === '/admin/finance'
+              ? pathname === '/admin/finance'
+              : pathname.startsWith(item.href)
             return (
               <Link
                 key={item.name}

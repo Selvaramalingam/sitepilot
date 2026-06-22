@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { useCurrency } from '@/hooks/useCurrency'
@@ -10,7 +11,8 @@ import {
   DollarSign, 
   Wallet,
   Clock,
-  ArrowRightLeft
+  ArrowRightLeft,
+  ExternalLink
 } from 'lucide-react'
 
 export default function FinanceDashboardPage() {
@@ -157,13 +159,21 @@ export default function FinanceDashboardPage() {
         
         {/* Recent Transactions */}
         <div className="lg:col-span-2 space-y-4">
-          <h3 className="text-lg font-bold font-heading flex items-center gap-2">
-            <ArrowRightLeft className="w-5 h-5 text-indigo-500" /> Recent Transactions
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold font-heading flex items-center gap-2">
+              <ArrowRightLeft className="w-5 h-5 text-indigo-500" /> Recent Transactions
+            </h3>
+            <Link href="/admin/finance/transactions" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition-colors">
+              View All <ExternalLink className="w-3 h-3" />
+            </Link>
+          </div>
           <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
             <CardContent className="p-0">
               {recentTx.length === 0 ? (
-                <div className="p-8 text-center text-muted-foreground text-sm">No recent transactions found.</div>
+                <div className="p-8 text-center text-muted-foreground text-sm">
+                  No recent transactions found.{' '}
+                  <Link href="/admin/finance/transactions" className="text-indigo-400 hover:underline">Add one →</Link>
+                </div>
               ) : (
                 <div className="divide-y divide-border/40">
                   {recentTx.map(tx => (

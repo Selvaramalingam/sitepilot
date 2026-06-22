@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
+import { useAdminProject } from '@/components/admin-project-context'
 import { useCurrency } from '@/hooks/useCurrency'
 
 interface MoneyInRecord {
@@ -51,10 +52,11 @@ export default function Cashbook() {
   const [moneyInLogs, setMoneyInLogs] = useState<MoneyInRecord[]>([])
   const [moneyOutLogs, setMoneyOutLogs] = useState<MoneyOutRecord[]>([])
   const [loading, setLoading] = useState(true)
+  const { selectedProjectId, setSelectedProjectId } = useAdminProject()
 
   // Cost summaries
-  const [materialsCost, setMaterialsCost] = useState(0)
-  const [expensesCost, setExpensesCost] = useState(0)
+  const [rawMaterials, setRawMaterials] = useState<any[]>([])
+  const [rawExpenses, setRawExpenses] = useState<any[]>([])
 
   // Create States
   const [newMoneyIn, setNewMoneyIn] = useState({ projectId: '', sourceName: '', amount: '', date: '', method: 'Bank Transfer' })
@@ -124,12 +126,12 @@ export default function Cashbook() {
       }
 
       // Fetch material costs
-      const { data: materialsData } = await supabase.from('materials').select('cost, project:projects!inner(*)').eq('projects.company_id', companyId)
-      if (materialsData) setMaterialsCost(materialsData.reduce((acc: number, m: any) => acc + (parseFloat(m.cost) || 0), 0))
+      const { data: materialsData } = await supabase.from('materials').select('cost, project_id, project:projects!inner(*)').eq('projects.company_id', companyId)
+      if (materialsData) setRawMaterials(materialsData)
 
       // Fetch expenses
-      const { data: expensesData } = await supabase.from('expenses').select('amount, project:projects!inner(*)').eq('projects.company_id', companyId)
-      if (expensesData) setExpensesCost(expensesData.reduce((acc: number, e: any) => acc + (parseFloat(e.amount) || 0), 0))
+      const { data: expensesData } = await supabase.from('expenses').select('amount, project_id, project:projects!inner(*)').eq('projects.company_id', companyId)
+      if (expensesData) setRawExpenses(expensesData)
 
     } catch (e) {
       console.error(e)
@@ -213,14 +215,47 @@ export default function Cashbook() {
   }
 
   // Calculations
-  const totalMoneyIn = moneyInLogs.reduce((acc, p) => acc + p.amount, 0)
-  const totalMoneyOut = moneyOutLogs.reduce((acc, p) => acc + p.amount, 0)
-  const totalProjectCost = materialsCost + expensesCost
+  const filteredMoneyInLogs = moneyInLogs.filter(log => selectedProjectId === 'all' || log.projectId === selectedProjectId)
+  const filteredMoneyOutLogs = moneyOutLogs.filter(log => selectedProjectId === 'all' || log.projectId === selectedProjectId)
+  
+  const filteredMaterialsCost = rawMaterials
+    .filter(m => selectedProjectId === 'all' || m.project_id === selectedProjectId)
+    .reduce((acc, m) => acc + (parseFloat(m.cost) || 0), 0)
+    
+  const filteredExpensesCost = rawExpenses
+    .filter(e => selectedProjectId === 'all' || e.project_id === selectedProjectId)
+    .reduce((acc, e) => acc + (parseFloat(e.amount) || 0), 0)
+
+  const totalMoneyIn = filteredMoneyInLogs.reduce((acc, p) => acc + p.amount, 0)
+  const totalMoneyOut = filteredMoneyOutLogs.reduce((acc, p) => acc + p.amount, 0)
+  const totalProjectCost = filteredMaterialsCost + filteredExpensesCost
   const netBalance = totalMoneyIn - totalProjectCost
   const profitMargin = totalMoneyIn > 0 ? (netBalance / totalMoneyIn) * 100 : 0
 
   return (
     <div className="space-y-8">
+      {/* Project Filter Selector inside the page */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-card/40 backdrop-blur-sm border border-border/40 p-5 rounded-2xl">
+        <div>
+          <h2 className="text-xl font-bold font-heading">Project Cashbook Ledger</h2>
+          <p className="text-muted-foreground text-xs">Track client payments received, supplier payout costs, and profitability margins.</p>
+        </div>
+        <div className="flex items-center gap-2 bg-muted/40 border border-border/40 px-3 py-1.5 rounded-xl shrink-0 w-full sm:w-auto">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Project Filter:</span>
+          <select
+            className="bg-transparent text-sm font-semibold focus:outline-none cursor-pointer text-foreground w-full sm:w-48"
+            value={selectedProjectId}
+            onChange={(e) => setSelectedProjectId(e.target.value)}
+          >
+            <option value="all" className="bg-card">All Projects</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id} className="bg-card">
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
       {/* Cashflow Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className="border border-border/40 bg-card/40 backdrop-blur-sm p-4 flex items-center justify-between">
@@ -301,7 +336,7 @@ export default function Cashbook() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40 text-sm">
-                  {moneyInLogs.map(p => (
+                  {filteredMoneyInLogs.map(p => (
                     <tr key={p.id} className="hover:bg-muted/30">
                       <td className="px-4 py-3.5"><div className="font-semibold">{p.sourceName}</div><span className="text-xs text-muted-foreground">{p.projectName}</span></td>
                       <td className="px-4 py-3.5 font-bold text-emerald-500">{formatCurrency(p.amount)}</td>
@@ -372,7 +407,7 @@ export default function Cashbook() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40 text-sm">
-                  {moneyOutLogs.map(p => (
+                  {filteredMoneyOutLogs.map(p => (
                     <tr key={p.id} className="hover:bg-muted/30">
                       <td className="px-4 py-3.5"><div className="font-semibold">{p.supplier}</div><span className="text-xs text-muted-foreground">{p.projectName}</span></td>
                       <td className="px-4 py-3.5 font-bold text-pink-500">{formatCurrency(p.amount)}</td>

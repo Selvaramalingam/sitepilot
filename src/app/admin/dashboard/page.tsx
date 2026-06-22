@@ -18,6 +18,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useAdminProject } from '@/components/admin-project-context'
 
 export default function ContractorDashboard() {
   const router = useRouter()
@@ -37,6 +38,15 @@ export default function ContractorDashboard() {
   const [targetMetPct, setTargetMetPct] = useState('0.0%')
   const [netProfit, setNetProfit] = useState(0)
   const [grossYieldText, setGrossYieldText] = useState('0.0%')
+
+  const selectedProjectId = 'all'
+  const [rawData, setRawData] = useState<{
+    projects: any[]
+    expenses: any[]
+    materials: any[]
+    clientPayments: any[]
+    supplierPayments: any[]
+  } | null>(null)
 
   useEffect(() => {
     fetchSession()
@@ -96,24 +106,49 @@ export default function ContractorDashboard() {
         .select('*, project:projects!inner(*)')
         .eq('projects.company_id', companyId)
 
-      const dbProjects = projectsData || []
-      const dbExpenses = expensesData || []
-      const dbMaterials = materialsData || []
-      const dbClientPayments = clientPaymentsData || []
-      const dbSupplierPayments = supplierPaymentsData || []
+      setRawData({
+        projects: projectsData || [],
+        expenses: expensesData || [],
+        materials: materialsData || [],
+        clientPayments: clientPaymentsData || [],
+        supplierPayments: supplierPaymentsData || []
+      })
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-      // --- CALCULATIONS ---
-      const activeProjectsCount = dbProjects.filter(p => p.status !== 'Archived').length
+  useEffect(() => {
+    if (!rawData) return
 
-      const totalExpensesSum = dbExpenses.reduce((acc, e) => acc + (parseFloat(e.amount) || 0), 0)
-      const totalMaterialsSum = dbMaterials.reduce((acc, m) => acc + (parseFloat(m.cost) || 0), 0)
-      const totalSupplierPayouts = dbSupplierPayments.reduce((acc, s) => acc + (parseFloat(s.amount) || 0), 0)
-      const totalClientPayments = dbClientPayments.reduce((acc, c) => acc + (parseFloat(c.amount) || 0), 0)
+    let dbProjects = rawData.projects
+    let dbExpenses = rawData.expenses
+    let dbMaterials = rawData.materials
+    let dbClientPayments = rawData.clientPayments
+    let dbSupplierPayments = rawData.supplierPayments
 
-      const outstandingSupplierDues = Math.max(totalMaterialsSum - totalSupplierPayouts, 0)
-      const moneyIn = totalClientPayments
-      const moneyOut = totalExpensesSum + totalSupplierPayouts
-      const accruedProjectCost = totalExpensesSum + totalMaterialsSum
+    if (selectedProjectId !== 'all') {
+      dbProjects = dbProjects.filter(p => p.id === selectedProjectId)
+      dbExpenses = dbExpenses.filter(e => e.project_id === selectedProjectId)
+      dbMaterials = dbMaterials.filter(m => m.project_id === selectedProjectId)
+      dbClientPayments = dbClientPayments.filter(c => c.project_id === selectedProjectId)
+      dbSupplierPayments = dbSupplierPayments.filter(s => s.project_id === selectedProjectId)
+    }
+
+    // --- CALCULATIONS ---
+    const activeProjectsCount = dbProjects.filter(p => p.status !== 'Archived').length
+
+    const totalExpensesSum = dbExpenses.reduce((acc, e) => acc + (parseFloat(e.amount) || 0), 0)
+    const totalMaterialsSum = dbMaterials.reduce((acc, m) => acc + (parseFloat(m.cost) || 0), 0)
+    const totalSupplierPayouts = dbSupplierPayments.reduce((acc, s) => acc + (parseFloat(s.amount) || 0), 0)
+    const totalClientPayments = dbClientPayments.reduce((acc, c) => acc + (parseFloat(c.amount) || 0), 0)
+
+    const outstandingSupplierDues = Math.max(totalMaterialsSum - totalSupplierPayouts, 0)
+    const moneyIn = totalClientPayments
+    const moneyOut = totalExpensesSum + totalSupplierPayouts
+    const accruedProjectCost = totalExpensesSum + totalMaterialsSum
 
       // Set KPIs
       setKpiData({
@@ -197,12 +232,7 @@ export default function ContractorDashboard() {
       }))
       setMonthlyChart(chartMapped)
 
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [rawData, selectedProjectId])
 
   const kpis = [
     { name: 'Total Money In', value: formatCurrencyNoDecimals(kpiData.moneyIn), change: `Client Payments`, type: 'up', icon: ArrowUpRight, desc: 'Total Received' },

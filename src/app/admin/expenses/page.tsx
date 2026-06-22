@@ -23,6 +23,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useAdminProject } from '@/components/admin-project-context'
 
 interface Expense {
   id: string
@@ -42,6 +43,7 @@ export default function ContractorExpenses() {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All')
+  const { selectedProjectId, setSelectedProjectId } = useAdminProject()
   const [loading, setLoading] = useState(true)
 
   // New Expense form state
@@ -97,16 +99,15 @@ export default function ContractorExpenses() {
         .order('expense_date', { ascending: false })
 
       if (expensesData) {
-        const mapped = expensesData.map((e: any) => ({
+        setExpenses(expensesData.map((e: any) => ({
           id: e.id,
           projectId: e.project_id,
-          projectName: e.project?.name || 'Unknown Project',
+          projectName: e.project?.name || 'Unknown',
           category: e.category,
           amount: parseFloat(e.amount) || 0,
           date: e.expense_date,
           notes: e.notes || ''
-        }))
-        setExpenses(mapped)
+        })))
       }
     } catch (e) {
       console.error(e)
@@ -117,17 +118,13 @@ export default function ContractorExpenses() {
 
   const handleCreateExpense = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!contractor || !contractor.company_id) return
-
-    const projectId = newExpense.projectId
-    if (!projectId) return
-
+    if (!contractor?.company_id) return
     try {
       const supabase = createClient()
       const { error } = await supabase
         .from('expenses')
         .insert({
-          project_id: projectId,
+          project_id: newExpense.projectId,
           category: newExpense.category,
           amount: parseFloat(newExpense.amount) || 0,
           expense_date: newExpense.date || new Date().toISOString().split('T')[0],
@@ -135,7 +132,7 @@ export default function ContractorExpenses() {
         })
 
       if (error) {
-        alert('Failed to register expense: ' + error.message)
+        alert('Failed: ' + error.message)
         return
       }
 
@@ -156,7 +153,6 @@ export default function ContractorExpenses() {
   const handleEditExpenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingExpense || !contractor?.company_id) return
-
     try {
       const supabase = createClient()
       const { error } = await supabase
@@ -171,7 +167,7 @@ export default function ContractorExpenses() {
         .eq('id', editingExpense.id)
 
       if (error) {
-        alert('Failed to update expense: ' + error.message)
+        alert('Update failed: ' + error.message)
         return
       }
 
@@ -183,7 +179,7 @@ export default function ContractorExpenses() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this expense log?')) return
+    if (!confirm('Are you sure you want to delete this expense record?')) return
     try {
       const supabase = createClient()
       const { error } = await supabase
@@ -196,7 +192,7 @@ export default function ContractorExpenses() {
         return
       }
 
-      if (contractor) loadData(contractor.company_id!)
+      loadData(contractor!.company_id!)
     } catch (e) {
       console.error(e)
     }
@@ -204,9 +200,11 @@ export default function ContractorExpenses() {
 
   const filteredExpenses = expenses.filter(e => {
     const matchesSearch = e.notes.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          e.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           e.projectName.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCategory = selectedCategory === 'All' || e.category === selectedCategory
-    return matchesSearch && matchesCategory
+    const matchesProject = selectedProjectId === 'all' || e.projectId === selectedProjectId
+    return matchesSearch && matchesCategory && matchesProject
   })
 
   const totalExpense = filteredExpenses.reduce((acc, e) => acc + e.amount, 0)
@@ -269,6 +267,16 @@ export default function ContractorExpenses() {
               onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
+          <select
+            className="flex rounded-xl border border-border/40 bg-background/30 px-3 h-11 text-sm focus-visible:outline-none w-full sm:w-48 font-medium"
+            value={selectedProjectId}
+            onChange={e => setSelectedProjectId(e.target.value)}
+          >
+            <option value="all">All Projects</option>
+            {projects.map(p => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
           <select
             className="flex rounded-xl border border-border/40 bg-background/30 px-3 h-11 text-sm focus-visible:outline-none w-full sm:w-48"
             value={selectedCategory}

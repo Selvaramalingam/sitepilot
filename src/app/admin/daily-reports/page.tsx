@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
+import { useAdminProject } from '@/components/admin-project-context'
 
 interface DailyReport {
   id: string
@@ -38,6 +39,7 @@ export default function ContractorDailyReports() {
   const [reports, setReports] = useState<DailyReport[]>([])
   const [projects, setProjects] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState('')
+  const { selectedProjectId } = useAdminProject()
   const [loading, setLoading] = useState(true)
 
   // Form states
@@ -185,11 +187,13 @@ export default function ContractorDailyReports() {
     })
   }
 
-  const filteredReports = reports.filter(r => 
-    r.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.reporterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    r.workCompleted.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredReports = reports.filter(r => {
+    const matchesSearch = r.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          r.reporterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          r.workCompleted.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesProject = selectedProjectId === 'all' || r.projectId === selectedProjectId
+    return matchesSearch && matchesProject
+  })
 
   return (
     <div className="space-y-6">

@@ -23,9 +23,9 @@ export interface CompanyInfo {
 }
 
 const DEFAULT_PLANS = [
-  { name: 'Starter', price: 49, projects: '3', users: '2', storage: '5 GB', features: { Accounting: false, Materials: true, Expenses: true, Reports: false, Documents: true, AI: false } },
-  { name: 'Professional', price: 149, projects: '20', users: '5', storage: '25 GB', features: { Accounting: true, Materials: true, Expenses: true, Reports: true, Documents: true, AI: false } },
-  { name: 'Business', price: 299, projects: 'Unlimited', users: 'Unlimited', storage: '100 GB', features: { Accounting: true, Materials: true, Expenses: true, Reports: true, Documents: true, AI: true } }
+  { name: 'Starter', price: 49, projects: '3', users: '2', storage: '5 GB', features: { Accounting: false, Materials: true, Expenses: true, Reports: false, Tasks: true, Finance: false } },
+  { name: 'Professional', price: 149, projects: '20', users: '5', storage: '25 GB', features: { Accounting: true, Materials: true, Expenses: true, Reports: true, Tasks: true, Finance: true } },
+  { name: 'Business', price: 299, projects: 'Unlimited', users: 'Unlimited', storage: '100 GB', features: { Accounting: true, Materials: true, Expenses: true, Reports: true, Tasks: true, Finance: true } }
 ]
 
 // Initialize the Database with defaults

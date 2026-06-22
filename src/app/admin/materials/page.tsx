@@ -21,6 +21,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useAdminProject } from '@/components/admin-project-context'
 
 interface Material {
   id: string
@@ -42,7 +43,7 @@ export default function ContractorMaterials() {
   const [suppliers, setSuppliers] = useState<any[]>([])
   const [materials, setMaterials] = useState<Material[]>([])
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedProject, setSelectedProject] = useState('All')
+  const { selectedProjectId, setSelectedProjectId } = useAdminProject()
   const [loading, setLoading] = useState(true)
 
   // New Material form state
@@ -98,7 +99,7 @@ export default function ContractorMaterials() {
         .order('name', { ascending: true })
       setSuppliers(suppliersData || [])
 
-      // Fetch materials joined with projects and suppliers
+      // Fetch materials joined with projects & suppliers
       const { data: materialsData } = await supabase
         .from('materials')
         .select('*, project:projects!inner(*), supplier:suppliers(*)')
@@ -106,18 +107,18 @@ export default function ContractorMaterials() {
         .order('purchase_date', { ascending: false })
 
       if (materialsData) {
-        const mapped = materialsData.map((m: any) => ({
+        setMaterials(materialsData.map((m: any) => ({
           id: m.id,
           projectId: m.project_id,
-          projectName: m.project?.name || 'Unknown Project',
+          projectName: m.project?.name || 'Unknown',
           name: m.name,
           quantity: parseFloat(m.quantity) || 0,
           unit: m.unit,
-          supplier: m.supplier?.name || 'Unknown Supplier',
+          supplier: m.supplier?.name || 'Unknown',
+          supplierId: m.supplier_id || '',
           cost: parseFloat(m.cost) || 0,
           date: m.purchase_date
-        }))
-        setMaterials(mapped)
+        })))
       }
     } catch (e) {
       console.error(e)
@@ -128,8 +129,7 @@ export default function ContractorMaterials() {
 
   const handleCreateMaterial = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!contractor || !contractor.company_id) return
-
+    if (!contractor?.company_id) return
     const trimmedSupplier = newMaterial.supplier.trim()
     const projectId = newMaterial.projectId
     if (!projectId || !trimmedSupplier) return
@@ -137,7 +137,7 @@ export default function ContractorMaterials() {
     try {
       const supabase = createClient()
       
-      // 1. Resolve or Create Supplier
+      // Resolve or Create Supplier
       let supplierId = ''
       const { data: existingSupplier } = await supabase
         .from('suppliers')
@@ -165,21 +165,20 @@ export default function ContractorMaterials() {
         supplierId = newSup.id
       }
 
-      // 2. Insert material
-      const { error: matErr } = await supabase
+      const { error } = await supabase
         .from('materials')
         .insert({
           project_id: projectId,
           name: newMaterial.name,
           quantity: parseFloat(newMaterial.quantity) || 0,
           unit: newMaterial.unit,
-          supplier_id: supplierId,
+          supplier_id: supplierId || null,
           cost: parseFloat(newMaterial.cost) || 0,
           purchase_date: newMaterial.date || new Date().toISOString().split('T')[0]
         })
 
-      if (matErr) {
-        alert('Failed to register material: ' + matErr.message)
+      if (error) {
+        alert('Failed: ' + error.message)
         return
       }
 
@@ -202,7 +201,6 @@ export default function ContractorMaterials() {
   const handleEditMaterialSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingMaterial || !contractor?.company_id) return
-
     const trimmedSupplier = editMaterialForm.supplier.trim()
     const projectId = editMaterialForm.projectId
     if (!projectId || !trimmedSupplier) return
@@ -210,6 +208,7 @@ export default function ContractorMaterials() {
     try {
       const supabase = createClient()
       
+      // Resolve or Create Supplier
       let supplierId = ''
       const { data: existingSupplier } = await supabase
         .from('suppliers')
@@ -228,18 +227,23 @@ export default function ContractorMaterials() {
         if (newSup) supplierId = newSup.id
       }
 
-      await supabase
+      const { error } = await supabase
         .from('materials')
         .update({
           project_id: projectId,
           name: editMaterialForm.name,
           quantity: parseFloat(editMaterialForm.quantity) || 0,
           unit: editMaterialForm.unit,
-          supplier_id: supplierId,
+          supplier_id: supplierId || null,
           cost: parseFloat(editMaterialForm.cost) || 0,
           purchase_date: editMaterialForm.date
         })
         .eq('id', editingMaterial.id)
+
+      if (error) {
+        alert('Update failed: ' + error.message)
+        return
+      }
 
       setEditingMaterial(null)
       loadData(contractor.company_id)
@@ -249,7 +253,7 @@ export default function ContractorMaterials() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this material log?')) return
+    if (!confirm('Are you sure you want to delete this material record?')) return
     try {
       const supabase = createClient()
       const { error } = await supabase
@@ -262,20 +266,20 @@ export default function ContractorMaterials() {
         return
       }
 
-      if (contractor) loadData(contractor.company_id!)
-    } catch (e) {
-      console.error(e)
+      loadData(contractor!.company_id!)
+    } catch (err) {
+      console.error(err)
     }
   }
 
+  // Filters logic
   const filteredMaterials = materials.filter(m => {
     const matchesSearch = m.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          m.supplier.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesProject = selectedProject === 'All' || m.projectId === selectedProject
+                          m.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          m.projectName.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesProject = selectedProjectId === 'all' || m.projectId === selectedProjectId
     return matchesSearch && matchesProject
   })
-
-  const totalCost = filteredMaterials.reduce((acc, m) => acc + m.cost, 0)
 
   return (
     <div className="space-y-6">
@@ -283,12 +287,14 @@ export default function ContractorMaterials() {
         {suppliers.map(s => <option key={s.id} value={s.name} />)}
       </datalist>
 
-      {/* Top metrics bar */}
+      {/* Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <Card className="border border-border/40 bg-card/40 backdrop-blur-sm p-4 flex items-center justify-between">
           <div>
-            <span className="text-xs text-muted-foreground font-semibold">Total Material Cost</span>
-            <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-indigo-500">{formatCurrency(totalCost)}</h3>
+            <span className="text-xs text-muted-foreground font-semibold">Total Materials Cost</span>
+            <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-indigo-500">
+              {formatCurrency(filteredMaterials.reduce((acc, m) => acc + m.cost, 0))}
+            </h3>
           </div>
           <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
             <DollarSign className="w-5 h-5" />
@@ -329,11 +335,11 @@ export default function ContractorMaterials() {
             />
           </div>
           <select
-            className="flex rounded-xl border border-border/40 bg-background/30 px-3 h-11 text-sm focus-visible:outline-none w-full sm:w-48"
-            value={selectedProject}
-            onChange={e => setSelectedProject(e.target.value)}
+            className="flex rounded-xl border border-border/40 bg-background/30 px-3 h-11 text-sm focus-visible:outline-none w-full sm:w-48 font-medium"
+            value={selectedProjectId}
+            onChange={e => setSelectedProjectId(e.target.value)}
           >
-            <option value="All">All Projects</option>
+            <option value="all">All Projects</option>
             {projects.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}

@@ -19,6 +19,8 @@ interface Plan {
   features: { [key: string]: boolean }
 }
 
+const REAL_FEATURES = ['Accounting', 'Materials', 'Expenses', 'Reports', 'Tasks', 'Finance'] as const
+
 export default function SuperAdminSubscriptions() {
   const [plans, setPlans] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,8 +29,8 @@ export default function SuperAdminSubscriptions() {
     Materials: true,
     Expenses: true,
     Reports: true,
-    Documents: true,
-    AI: true
+    Tasks: true,
+    Finance: true
   })
   const [successMsg, setSuccessMsg] = useState('')
 
@@ -45,8 +47,8 @@ export default function SuperAdminSubscriptions() {
       Materials: true,
       Expenses: true,
       Reports: false,
-      Documents: true,
-      AI: false
+      Tasks: true,
+      Finance: false
     }
   })
 
@@ -311,8 +313,8 @@ export default function SuperAdminSubscriptions() {
           Materials: true,
           Expenses: true,
           Reports: false,
-          Documents: true,
-          AI: false
+          Tasks: true,
+          Finance: false
         }
       })
       setIsAddOpen(false)
@@ -449,7 +451,7 @@ export default function SuperAdminSubscriptions() {
                 <div className="space-y-2 pt-2 border-t border-border/20">
                   <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Module Permissions</Label>
                   <div className="grid grid-cols-2 gap-2 mt-1">
-                    {Object.keys(newPlan.features).map(feat => {
+                    {REAL_FEATURES.map(feat => {
                       const isAllowed = newPlan.features[feat as keyof typeof newPlan.features]
                       return (
                         <div 
@@ -540,7 +542,7 @@ export default function SuperAdminSubscriptions() {
                   <div className="space-y-2 pt-2 border-t border-border/20">
                     <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Module Permissions</Label>
                     <div className="grid grid-cols-2 gap-2 mt-1">
-                      {Object.keys(editingPlan.features).map(feat => {
+                      {REAL_FEATURES.map(feat => {
                         const isAllowed = editingPlan.features[feat]
                         return (
                           <div 
@@ -599,8 +601,8 @@ export default function SuperAdminSubscriptions() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 pt-2">
-          {(Object.keys(globalFeatures) as Array<keyof typeof globalFeatures>).map(feat => {
-            const isEnabled = globalFeatures[feat]
+          {REAL_FEATURES.map(feat => {
+            const isEnabled = globalFeatures[feat as keyof typeof globalFeatures]
             return (
               <div 
                 key={feat}
@@ -613,7 +615,6 @@ export default function SuperAdminSubscriptions() {
               >
                 <div>
                   <h4 className="font-semibold text-sm flex items-center gap-1.5 text-foreground">
-                    {feat === 'AI' && <Sparkles className="h-4 w-4 text-pink-500" />}
                     {feat}
                   </h4>
                   <span className="text-[10px] text-muted-foreground">
@@ -700,7 +701,7 @@ export default function SuperAdminSubscriptions() {
                   <div className="space-y-2 pt-2 border-t border-border/20">
                     <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Module Permissions</Label>
                     <div className="grid grid-cols-2 gap-2 mt-1.5">
-                      {Object.keys(plan.features).map(feat => {
+                      {REAL_FEATURES.map(feat => {
                         const isAllowed = plan.features[feat]
                         return (
                           <div 

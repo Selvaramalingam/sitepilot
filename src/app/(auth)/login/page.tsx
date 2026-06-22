@@ -72,7 +72,7 @@ export default function LoginPage() {
       if (profile.role === 'SUPER_ADMIN') {
         router.push('/super-admin/dashboard')
       } else if (profile.role === 'CONTRACTOR_OWNER') {
-        router.push('/contractor/dashboard')
+        router.push('/admin/dashboard')
       } else if (profile.role === 'SITE_ENGINEER') {
         router.push('/site-engineer/dashboard')
       } else {

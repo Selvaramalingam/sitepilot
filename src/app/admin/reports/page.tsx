@@ -8,6 +8,7 @@ import { FileText, Download, Play, CheckCircle2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getCurrentUser, UserProfile } from '@/lib/auth-helpers'
 import { useCurrency } from '@/hooks/useCurrency'
+import { useAdminProject } from '@/components/admin-project-context'
 
 export default function ContractorReports() {
   const router = useRouter()
@@ -15,6 +16,7 @@ export default function ContractorReports() {
   const [contractor, setContractor] = useState<UserProfile | null>(null)
   const [exportingReport, setExportingReport] = useState<string | null>(null)
   const [successReport, setSuccessReport] = useState<string | null>(null)
+  const { selectedProjectId, setSelectedProjectId, projects } = useAdminProject()
 
   useEffect(() => {
     fetchSession()
@@ -67,7 +69,18 @@ export default function ContractorReports() {
     setSuccessReport(null)
 
     try {
-      const db = await fetchReportData(contractor.company_id)
+      let db = await fetchReportData(contractor.company_id)
+      
+      if (selectedProjectId !== 'all') {
+        db = {
+          projects: db.projects.filter(p => p.id === selectedProjectId),
+          materials: db.materials.filter((m: any) => m.project_id === selectedProjectId),
+          expenses: db.expenses.filter((e: any) => e.project_id === selectedProjectId),
+          clientPayments: db.clientPayments.filter((cp: any) => cp.project_id === selectedProjectId),
+          supplierPayments: db.supplierPayments.filter((sp: any) => sp.project_id === selectedProjectId),
+          suppliers: db.suppliers
+        }
+      }
       
       if (format === 'Excel') {
         let csvContent = ''
@@ -586,14 +599,32 @@ export default function ContractorReports() {
     <div className="space-y-6">
       {/* Overview Card */}
       <Card className="border border-border/50 bg-card/40 backdrop-blur-sm">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-indigo-500" />
-            <CardTitle className="text-lg font-bold">Financial Statements & Operations Reports</CardTitle>
+        <CardHeader className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-indigo-500" />
+              <CardTitle className="text-lg font-bold">Financial Statements & Operations Reports</CardTitle>
+            </div>
+            <CardDescription className="pt-1">
+              Compile and generate project audits. All files can be exported into standard vector PDF or spreadsheet formats.
+            </CardDescription>
           </div>
-          <CardDescription>
-            Compile and generate project audits. All files can be exported into standard vector PDF or spreadsheet formats.
-          </CardDescription>
+          
+          <div className="flex items-center gap-2 bg-muted/40 border border-border/40 px-3 py-1.5 rounded-xl shrink-0 w-full sm:w-auto">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Project Filter:</span>
+            <select
+              className="bg-transparent text-sm font-semibold focus:outline-none cursor-pointer text-foreground w-full sm:w-48"
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+            >
+              <option value="all" className="bg-card">All Projects</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id} className="bg-card">
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </CardHeader>
       </Card>
 

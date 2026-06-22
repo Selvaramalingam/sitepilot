@@ -472,7 +472,7 @@ export default function SuperAdminCompanies() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open(`/contractor/dashboard?companyId=${c.id}`, '_blank')}
+                    onClick={() => window.open(`/admin/dashboard?companyId=${c.id}`, '_blank')}
                     className="rounded-lg gap-1.5 text-xs h-9 border-border/40 hover:bg-indigo-500/10 hover:text-indigo-400"
                   >
                     <ExternalLink className="h-3.5 w-3.5" /> Dashboard

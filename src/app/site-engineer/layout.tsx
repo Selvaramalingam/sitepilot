@@ -2,11 +2,12 @@
 
 import React from 'react'
 import { PortalLayout, type NavigationItem } from '@/components/portal-layout'
-import { LayoutDashboard, FileSpreadsheet } from 'lucide-react'
+import { LayoutDashboard, FileSpreadsheet, CheckSquare } from 'lucide-react'
 
 const navigation: NavigationItem[] = [
   { name: 'Assigned Projects', href: '/site-engineer/dashboard', icon: LayoutDashboard },
-  { name: 'Field Entries log', href: '/site-engineer/entries', icon: FileSpreadsheet }
+  { name: 'Field Entries log', href: '/site-engineer/entries', icon: FileSpreadsheet },
+  { name: 'My Tasks', href: '/site-engineer/tasks', icon: CheckSquare }
 ]
 
 export default function SiteEngineerLayout({

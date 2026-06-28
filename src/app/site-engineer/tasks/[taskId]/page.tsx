@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { createClient } from '@/lib/supabase/client'
 import { TaskPriorityBadge, TaskStatusBadge } from '@/components/ui/task-badge'
 import { FileUploader } from '@/components/ui/file-uploader'
+import { recalculateTaskProgress } from '@/lib/task-utils'
 import { 
   ArrowLeft, 
   Calendar,
@@ -97,17 +98,30 @@ export default function EngineerTaskDetailPage({ params }: { params: Promise<{ t
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
-      await supabase.from('tasks').update({ progress: val }).eq('id', taskId)
-      
-      await supabase.from('task_history').insert({
-        task_id: taskId,
-        action: 'UPDATED_PROGRESS',
-        user_id: user?.id,
-        metadata: { new_value: val }
-      })
+      // Lock progress calculation to checklists if they exist
+      const { data: checklists } = await supabase
+        .from('task_checklists')
+        .select('id')
+        .eq('task_id', taskId)
 
-      setTask({ ...task, progress: val })
-      fetchRelatedData(supabase)
+      let finalVal = val
+      if (checklists && checklists.length > 0) {
+        const progressVal = await recalculateTaskProgress(supabase, taskId)
+        if (progressVal !== null) {
+          finalVal = progressVal
+        }
+      } else {
+        await supabase.from('tasks').update({ progress: val }).eq('id', taskId)
+        
+        await supabase.from('task_history').insert({
+          task_id: taskId,
+          action: 'UPDATED_PROGRESS',
+          user_id: user?.id,
+          metadata: { new_value: val }
+        })
+      }
+
+      loadData()
     } catch (e) {
       console.error(e)
     }
@@ -128,8 +142,8 @@ export default function EngineerTaskDetailPage({ params }: { params: Promise<{ t
         metadata: { new_value: newStatus }
       })
 
-      setTask({ ...task, status: newStatus })
-      fetchRelatedData(supabase)
+      await recalculateTaskProgress(supabase, taskId)
+      loadData()
     } catch (e) {
       console.error(e)
     }
@@ -142,7 +156,6 @@ export default function EngineerTaskDetailPage({ params }: { params: Promise<{ t
 
       await supabase.from('task_checklists').update({ is_completed: isCompleted }).eq('id', id)
       
-      // Optionally log checklist toggle
       await supabase.from('task_history').insert({
         task_id: taskId,
         action: 'CHECKLIST_TOGGLED',
@@ -150,7 +163,8 @@ export default function EngineerTaskDetailPage({ params }: { params: Promise<{ t
         metadata: { item_id: id, is_completed: isCompleted }
       })
 
-      fetchRelatedData(supabase)
+      await recalculateTaskProgress(supabase, taskId)
+      loadData()
     } catch (e) {
       console.error(e)
     }

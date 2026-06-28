@@ -12,6 +12,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { createClient } from '@/lib/supabase/client'
 import { TaskPriorityBadge, TaskStatusBadge } from '@/components/ui/task-badge'
 import { FileUploader } from '@/components/ui/file-uploader'
+import { recalculateTaskProgress } from '@/lib/task-utils'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { 
   ArrowLeft, 
   Calendar,
@@ -23,7 +25,9 @@ import {
   History,
   Trash2,
   Paperclip,
-  Download
+  Download,
+  AlertCircle,
+  Pencil
 } from 'lucide-react'
 
 export default function AdminTaskDetailPage({ params }: { params: Promise<{ taskId: string }> }) {
@@ -36,11 +40,35 @@ export default function AdminTaskDetailPage({ params }: { params: Promise<{ task
   const [comments, setComments] = useState<any[]>([])
   const [history, setHistory] = useState<any[]>([])
   const [engineers, setEngineers] = useState<any[]>([])
+  const [projects, setProjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   // New states
   const [newChecklist, setNewChecklist] = useState('')
   const [newComment, setNewComment] = useState('')
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [formLoading, setFormLoading] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    id: '',
+    projectId: '',
+    title: '',
+    description: '',
+    assignedTo: '',
+    priority: 'Medium',
+    startDate: '',
+    dueDate: '',
+    estimatedHours: '',
+    status: 'Draft',
+    progress: '0',
+    category: ''
+  })
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   useEffect(() => {
     loadData()
@@ -51,6 +79,9 @@ export default function AdminTaskDetailPage({ params }: { params: Promise<{ task
     try {
       const supabase = createClient()
       
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
       const { data: tData } = await supabase
         .from('tasks')
         .select(`
@@ -68,9 +99,16 @@ export default function AdminTaskDetailPage({ params }: { params: Promise<{ task
       }
       setTask(tData)
 
+      const { data: profile } = await supabase.from('users').select('company_id').eq('id', user.id).single()
+      const companyId = profile?.company_id || tData.project?.company_id
+
       // Get engineers for reassignment
-      const { data: eData } = await supabase.from('users').select('id, full_name').eq('company_id', tData.project.company_id).eq('role', 'SITE_ENGINEER')
+      const { data: eData } = await supabase.from('users').select('id, full_name').eq('company_id', companyId).eq('role', 'SITE_ENGINEER')
       setEngineers(eData || [])
+
+      // Get projects for reassignment
+      const { data: pData } = await supabase.from('projects').select('id, name').eq('company_id', companyId)
+      setProjects(pData || [])
 
       // Fetch related data
       await fetchRelatedData(supabase)
@@ -79,6 +117,66 @@ export default function AdminTaskDetailPage({ params }: { params: Promise<{ task
       console.error(e)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleOpenEdit = () => {
+    setEditFormData({
+      id: task.id,
+      projectId: task.project_id || '',
+      title: task.title || '',
+      description: task.description || '',
+      assignedTo: task.assigned_to || '',
+      priority: task.priority || 'Medium',
+      startDate: task.start_date || '',
+      dueDate: task.due_date || '',
+      estimatedHours: task.estimated_hours?.toString() || '0',
+      status: task.status || 'Draft',
+      progress: task.progress?.toString() || '0',
+      category: task.category || ''
+    })
+    setIsEditOpen(true)
+  }
+
+  const handleEditTask = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormLoading(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      const { error } = await supabase.from('tasks').update({
+        project_id: editFormData.projectId,
+        title: editFormData.title,
+        description: editFormData.description,
+        assigned_to: editFormData.assignedTo || null,
+        priority: editFormData.priority,
+        start_date: editFormData.startDate || null,
+        due_date: editFormData.dueDate || null,
+        estimated_hours: parseFloat(editFormData.estimatedHours) || 0,
+        status: editFormData.status,
+        progress: parseInt(editFormData.progress) || 0,
+        category: editFormData.category || null
+      }).eq('id', editFormData.id)
+
+      if (error) throw error
+
+      await supabase.from('task_history').insert({
+        task_id: editFormData.id,
+        action: 'UPDATED',
+        user_id: user?.id,
+        metadata: { title: editFormData.title }
+      })
+
+      // Recalculate progress to ensure consistency
+      await recalculateTaskProgress(supabase, editFormData.id)
+
+      setIsEditOpen(false)
+      loadData()
+    } catch (e: any) {
+      alert('Failed to update task: ' + e.message)
+    } finally {
+      setFormLoading(false)
     }
   }
 
@@ -110,6 +208,10 @@ export default function AdminTaskDetailPage({ params }: { params: Promise<{ task
         metadata: { new_value: value }
       })
 
+      if (field === 'status') {
+        await recalculateTaskProgress(supabase, taskId)
+      }
+
       loadData()
     } catch (e) {
       console.error(e)
@@ -127,7 +229,8 @@ export default function AdminTaskDetailPage({ params }: { params: Promise<{ task
         title: newChecklist
       })
       setNewChecklist('')
-      fetchRelatedData(supabase)
+      await recalculateTaskProgress(supabase, taskId)
+      loadData()
     } catch (e) {
       console.error(e)
     }
@@ -137,7 +240,8 @@ export default function AdminTaskDetailPage({ params }: { params: Promise<{ task
     try {
       const supabase = createClient()
       await supabase.from('task_checklists').update({ is_completed: isCompleted }).eq('id', id)
-      fetchRelatedData(supabase)
+      await recalculateTaskProgress(supabase, taskId)
+      loadData()
     } catch (e) {
       console.error(e)
     }
@@ -147,7 +251,8 @@ export default function AdminTaskDetailPage({ params }: { params: Promise<{ task
     try {
       const supabase = createClient()
       await supabase.from('task_checklists').delete().eq('id', id)
-      fetchRelatedData(supabase)
+      await recalculateTaskProgress(supabase, taskId)
+      loadData()
     } catch (e) {
       console.error(e)
     }
@@ -179,6 +284,46 @@ export default function AdminTaskDetailPage({ params }: { params: Promise<{ task
     }
   }
 
+  const handleDeleteAttachment = async (file: any) => {
+    if (!confirm(`Are you sure you want to delete the file "${file.file_name}"?`)) return
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      const urlParts = file.file_url.split('/task-attachments/')
+      if (urlParts.length < 2) {
+        throw new Error('Invalid file URL format')
+      }
+      const storagePath = urlParts[1]
+
+      const { error: storageError } = await supabase.storage
+        .from('task-attachments')
+        .remove([storagePath])
+
+      if (storageError) throw storageError
+
+      const { error: dbError } = await supabase
+        .from('task_attachments')
+        .delete()
+        .eq('id', file.id)
+
+      if (dbError) throw dbError
+
+      await supabase.from('task_history').insert({
+        task_id: taskId,
+        action: 'FILE_DELETED',
+        user_id: user?.id,
+        metadata: { file_name: file.file_name }
+      })
+
+      showToast('File deleted successfully', 'success')
+      loadData()
+    } catch (error: any) {
+      console.error('Error deleting file:', error)
+      showToast(error.message || 'Failed to delete file', 'error')
+    }
+  }
+
   const handleDeleteTask = async () => {
     if (!confirm('Are you sure you want to delete this task completely?')) return
     try {
@@ -199,9 +344,14 @@ export default function AdminTaskDetailPage({ params }: { params: Promise<{ task
         <Button variant="ghost" className="gap-2 -ml-4 hover:bg-transparent" onClick={() => router.push('/admin/tasks')}>
           <ArrowLeft className="w-4 h-4" /> Back to Tasks
         </Button>
-        <Button variant="ghost" className="text-red-500 hover:bg-red-500/10 hover:text-red-600 gap-2" onClick={handleDeleteTask}>
-          <Trash2 className="w-4 h-4" /> Delete Task
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="gap-2 rounded-xl" onClick={handleOpenEdit}>
+            <Pencil className="w-4 h-4" /> Edit Task
+          </Button>
+          <Button variant="ghost" className="text-red-500 hover:bg-red-500/10 hover:text-red-600 gap-2" onClick={handleDeleteTask}>
+            <Trash2 className="w-4 h-4" /> Delete Task
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -211,7 +361,10 @@ export default function AdminTaskDetailPage({ params }: { params: Promise<{ task
           <Card className="border-border/40 bg-card/40 backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex justify-between items-start mb-4">
-                <h1 className="text-2xl font-bold font-heading">{task.title}</h1>
+                <div>
+                  <h1 className="text-2xl font-bold font-heading mb-1">{task.title}</h1>
+                  <p className="text-sm font-semibold text-indigo-500">{task.project?.name || 'No Project'}</p>
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-3 mb-6">
                 <TaskStatusBadge status={task.status} />
@@ -319,9 +472,14 @@ export default function AdminTaskDetailPage({ params }: { params: Promise<{ task
                           <p className="text-sm font-semibold truncate text-foreground">{file.file_name}</p>
                           <p className="text-[10px] text-muted-foreground">By {file.uploader?.full_name} • {(file.file_size / 1024).toFixed(1)} KB</p>
                         </div>
-                        <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-indigo-500" onClick={() => window.open(file.file_url, '_blank')}>
-                          <Download className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-indigo-500" onClick={() => window.open(file.file_url, '_blank')}>
+                            <Download className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-red-500" onClick={() => handleDeleteAttachment(file)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                     {attachments.length === 0 && <p className="col-span-full py-4 text-center text-sm text-muted-foreground">No files attached.</p>}
@@ -400,6 +558,104 @@ export default function AdminTaskDetailPage({ params }: { params: Promise<{ task
           </Card>
         </div>
 
+      {toast && (
+        <div className={`fixed bottom-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl border shadow-lg transition-all duration-300 animate-in fade-in slide-in-from-bottom-4 ${
+          toast.type === 'success' 
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500' 
+            : 'bg-red-500/10 border-red-500/30 text-red-500'
+        }`}>
+          {toast.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 shrink-0" />
+          )}
+          <span className="text-sm font-medium">{toast.message}</span>
+        </div>
+      )}
+
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
+            <DialogDescription>Modify the task details below.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditTask} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>Task Title</Label>
+              <Input required placeholder="e.g. Inspect foundation wiring" value={editFormData.title} onChange={e => setEditFormData({...editFormData, title: e.target.value})} className="rounded-xl bg-background/50" />
+            </div>
+            <div className="space-y-2">
+              <Label>Project</Label>
+              <select required className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus-visible:outline-none" value={editFormData.projectId} onChange={e => setEditFormData({...editFormData, projectId: e.target.value})}>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <textarea rows={3} className="flex w-full rounded-xl border border-border/40 bg-background/50 p-3 text-sm focus-visible:outline-none" placeholder="Task details..." value={editFormData.description} onChange={e => setEditFormData({...editFormData, description: e.target.value})} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Assign To</Label>
+                <select className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus-visible:outline-none" value={editFormData.assignedTo} onChange={e => setEditFormData({...editFormData, assignedTo: e.target.value})}>
+                  <option value="">Unassigned</option>
+                  {engineers.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <select className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus-visible:outline-none" value={editFormData.priority} onChange={e => setEditFormData({...editFormData, priority: e.target.value})}>
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <select className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus-visible:outline-none" value={editFormData.status} onChange={e => setEditFormData({...editFormData, status: e.target.value})}>
+                  <option value="Draft">Draft</option>
+                  <option value="Pending">Pending</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="On Hold">On Hold</option>
+                  <option value="Review">Review</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Progress (%)</Label>
+                <Input type="number" min="0" max="100" value={editFormData.progress} onChange={e => setEditFormData({...editFormData, progress: e.target.value})} className="rounded-xl bg-background/50" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Est. Hours</Label>
+                <Input type="number" min="0" step="0.5" placeholder="e.g. 4.5" value={editFormData.estimatedHours} onChange={e => setEditFormData({...editFormData, estimatedHours: e.target.value})} className="rounded-xl bg-background/50" />
+              </div>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Input placeholder="e.g. Electrical" value={editFormData.category} onChange={e => setEditFormData({...editFormData, category: e.target.value})} className="rounded-xl bg-background/50" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Input type="date" value={editFormData.startDate} onChange={e => setEditFormData({...editFormData, startDate: e.target.value})} className="rounded-xl bg-background/50" />
+              </div>
+              <div className="space-y-2">
+                <Label>Due Date</Label>
+                <Input type="date" value={editFormData.dueDate} onChange={e => setEditFormData({...editFormData, dueDate: e.target.value})} className="rounded-xl bg-background/50" />
+              </div>
+            </div>
+            <Button type="submit" disabled={formLoading} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-6 mt-4">
+              {formLoading ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
       </div>
     </div>
   )

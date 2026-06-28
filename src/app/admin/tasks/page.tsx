@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
 import { useAdminProject } from '@/components/admin-project-context'
 import { TaskPriorityBadge, TaskStatusBadge } from '@/components/ui/task-badge'
+import { recalculateTaskProgress } from '@/lib/task-utils'
 import { 
   CheckSquare, 
   Search, 
@@ -17,7 +18,9 @@ import {
   Calendar,
   Clock,
   User,
-  AlertCircle
+  AlertCircle,
+  Pencil,
+  Briefcase
 } from 'lucide-react'
 
 export default function AdminTasksPage() {
@@ -45,6 +48,22 @@ export default function AdminTasksPage() {
     estimatedHours: ''
   })
   const [formLoading, setFormLoading] = useState(false)
+
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    id: '',
+    projectId: '',
+    title: '',
+    description: '',
+    assignedTo: '',
+    priority: 'Medium',
+    startDate: '',
+    dueDate: '',
+    estimatedHours: '',
+    status: 'Draft',
+    progress: '0',
+    category: ''
+  })
 
   useEffect(() => {
     loadData()
@@ -126,6 +145,48 @@ export default function AdminTasksPage() {
       loadData()
     } catch (e: any) {
       alert('Failed to create task: ' + e.message)
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
+  const handleEditTask = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormLoading(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      const { error } = await supabase.from('tasks').update({
+        project_id: editFormData.projectId,
+        title: editFormData.title,
+        description: editFormData.description,
+        assigned_to: editFormData.assignedTo || null,
+        priority: editFormData.priority,
+        start_date: editFormData.startDate || null,
+        due_date: editFormData.dueDate || null,
+        estimated_hours: parseFloat(editFormData.estimatedHours) || 0,
+        status: editFormData.status,
+        progress: parseInt(editFormData.progress) || 0,
+        category: editFormData.category || null
+      }).eq('id', editFormData.id)
+
+      if (error) throw error
+
+      await supabase.from('task_history').insert({
+        task_id: editFormData.id,
+        action: 'UPDATED',
+        user_id: user?.id,
+        metadata: { title: editFormData.title }
+      })
+
+      // Recalculate progress to ensure consistency
+      await recalculateTaskProgress(supabase, editFormData.id)
+
+      setIsEditOpen(false)
+      loadData()
+    } catch (e: any) {
+      alert('Failed to update task: ' + e.message)
     } finally {
       setFormLoading(false)
     }
@@ -325,14 +386,46 @@ export default function AdminTasksPage() {
               >
                 <CardContent className="p-5 flex flex-col h-full">
                   <div className="flex justify-between items-start mb-3">
-                    <TaskStatusBadge status={task.status} />
-                    <TaskPriorityBadge priority={task.priority} />
+                    <div className="flex gap-1.5">
+                      <TaskStatusBadge status={task.status} />
+                      <TaskPriorityBadge priority={task.priority} />
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-muted-foreground hover:text-indigo-500 rounded-lg -mt-1 -mr-2"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditFormData({
+                          id: task.id,
+                          projectId: task.project_id || '',
+                          title: task.title || '',
+                          description: task.description || '',
+                          assignedTo: task.assigned_to || '',
+                          priority: task.priority || 'Medium',
+                          startDate: task.start_date || '',
+                          dueDate: task.due_date || '',
+                          estimatedHours: task.estimated_hours?.toString() || '0',
+                          status: task.status || 'Draft',
+                          progress: task.progress?.toString() || '0',
+                          category: task.category || ''
+                        })
+                        setIsEditOpen(true)
+                      }}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
                   </div>
                   
                   <h3 className="font-bold text-lg mb-1 leading-tight line-clamp-2">{task.title}</h3>
                   <p className="text-xs text-muted-foreground mb-4 line-clamp-2">{task.description || 'No description provided.'}</p>
                   
                   <div className="mt-auto space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+                      <Briefcase className="w-3.5 h-3.5 text-indigo-500" />
+                      <span>Project: {task.project?.name || 'No Project'}</span>
+                    </div>
+
                     <div className="flex items-center gap-2 text-xs font-medium text-foreground">
                       <User className="w-3.5 h-3.5 text-indigo-500" />
                       {task.assignee?.full_name || 'Unassigned'}
@@ -366,6 +459,90 @@ export default function AdminTasksPage() {
           })
         )}
       </div>
+
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Task</DialogTitle>
+            <DialogDescription>Modify the task details below.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditTask} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label>Task Title</Label>
+              <Input required placeholder="e.g. Inspect foundation wiring" value={editFormData.title} onChange={e => setEditFormData({...editFormData, title: e.target.value})} className="rounded-xl bg-background/50" />
+            </div>
+            <div className="space-y-2">
+              <Label>Project</Label>
+              <select required className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus-visible:outline-none" value={editFormData.projectId} onChange={e => setEditFormData({...editFormData, projectId: e.target.value})}>
+                {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <textarea rows={3} className="flex w-full rounded-xl border border-border/40 bg-background/50 p-3 text-sm focus-visible:outline-none" placeholder="Task details..." value={editFormData.description} onChange={e => setEditFormData({...editFormData, description: e.target.value})} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Assign To</Label>
+                <select className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus-visible:outline-none" value={editFormData.assignedTo} onChange={e => setEditFormData({...editFormData, assignedTo: e.target.value})}>
+                  <option value="">Unassigned</option>
+                  {engineers.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <select className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus-visible:outline-none" value={editFormData.priority} onChange={e => setEditFormData({...editFormData, priority: e.target.value})}>
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <select className="flex w-full rounded-xl border border-border/40 bg-background/50 px-3 h-10 text-sm focus-visible:outline-none" value={editFormData.status} onChange={e => setEditFormData({...editFormData, status: e.target.value})}>
+                  <option value="Draft">Draft</option>
+                  <option value="Pending">Pending</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="On Hold">On Hold</option>
+                  <option value="Review">Review</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Progress (%)</Label>
+                <Input type="number" min="0" max="100" value={editFormData.progress} onChange={e => setEditFormData({...editFormData, progress: e.target.value})} className="rounded-xl bg-background/50" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Est. Hours</Label>
+                <Input type="number" min="0" step="0.5" placeholder="e.g. 4.5" value={editFormData.estimatedHours} onChange={e => setEditFormData({...editFormData, estimatedHours: e.target.value})} className="rounded-xl bg-background/50" />
+              </div>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Input placeholder="e.g. Electrical" value={editFormData.category} onChange={e => setEditFormData({...editFormData, category: e.target.value})} className="rounded-xl bg-background/50" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Input type="date" value={editFormData.startDate} onChange={e => setEditFormData({...editFormData, startDate: e.target.value})} className="rounded-xl bg-background/50" />
+              </div>
+              <div className="space-y-2">
+                <Label>Due Date</Label>
+                <Input type="date" value={editFormData.dueDate} onChange={e => setEditFormData({...editFormData, dueDate: e.target.value})} className="rounded-xl bg-background/50" />
+              </div>
+            </div>
+            <Button type="submit" disabled={formLoading} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-6 mt-4">
+              {formLoading ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
